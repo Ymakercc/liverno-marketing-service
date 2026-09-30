@@ -32,3 +32,23 @@ test('website research follows public redirects and blocks private destinations'
   assert.equal(fetched.status, 'fetched');
   assert.equal(blocked.status, 'missing');
 });
+
+test('website research cancels oversized streaming responses before reading the full body', async () => {
+  let cancelled = false;
+  let chunks = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      chunks += 1;
+      controller.enqueue(new Uint8Array(600_000));
+    },
+    cancel() { cancelled = true; },
+  });
+  const result = await researchWebsite('example.com', {
+    lookupImpl: async () => [{ address: '93.184.216.34' }],
+    fetchImpl: async () => new Response(body, { headers: { 'content-type': 'text/html' } }),
+  });
+  assert.equal(result.status, 'failed');
+  assert.match(result.error, /1 MB/);
+  assert.equal(cancelled, true);
+  assert.ok(chunks < 4);
+});

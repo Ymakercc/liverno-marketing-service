@@ -65,6 +65,55 @@ export const outboundDraftSchema = {
   ],
 };
 
+export const companyQualificationSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    qualified: { type: ['boolean', 'null'] },
+    reviewRequired: { type: 'boolean' },
+    qualificationReason: { type: 'string' },
+    country: { type: 'string' },
+    region: { type: 'string' },
+    industry: { type: 'string' },
+    customerType: { type: 'string' },
+    customerProfile: { type: 'string' },
+    painPoints: { type: 'array', items: { type: 'string' } },
+    recommendedProducts: {
+      type: 'array', items: {
+        type: 'object', additionalProperties: false,
+        properties: { name: { type: 'string' }, reason: { type: 'string' } },
+        required: ['name', 'reason'],
+      },
+    },
+    riskFlags: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['qualified', 'reviewRequired', 'qualificationReason', 'country', 'region',
+    'industry', 'customerType', 'customerProfile', 'painPoints', 'recommendedProducts', 'riskFlags'],
+};
+
+function parseQualification(outputText) {
+  let result;
+  try {
+    const text = String(outputText || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    result = JSON.parse(text);
+  } catch {
+    throw new AppError('AI 企业判断不是有效 JSON', { status: 502, code: 'QUALIFICATION_INVALID_OUTPUT' });
+  }
+  const strings = ['qualificationReason', 'country', 'region', 'industry', 'customerType', 'customerProfile'];
+  const lists = ['painPoints', 'riskFlags'];
+  if (!result || ![true, false, null].includes(result.qualified) ||
+      typeof result.reviewRequired !== 'boolean' ||
+      strings.some((field) => typeof result[field] !== 'string') ||
+      lists.some((field) => !Array.isArray(result[field]) ||
+        result[field].some((item) => typeof item !== 'string')) ||
+      !Array.isArray(result.recommendedProducts) ||
+      result.recommendedProducts.some((item) => typeof item?.name !== 'string' ||
+        typeof item?.reason !== 'string')) {
+    throw new AppError('AI 企业判断缺少必要字段', { status: 502, code: 'QUALIFICATION_INVALID_OUTPUT' });
+  }
+  return result;
+}
+
 function extractOutputText(response) {
   if (typeof response.output_text === 'string' && response.output_text) return response.output_text;
   return (response.output || [])
@@ -153,6 +202,66 @@ export class OpenAIClient {
   constructor(config, { fetchImpl = fetch } = {}) {
     this.config = config;
     this.fetch = fetchImpl;
+  }
+
+  async qualifyCompany({ input, researchId }) {
+    requireConfiguration({
+      OPENAI_BASE_URL: this.config.baseUrl,
+      OPENAI_API_KEY: this.config.apiKey,
+      OPENAI_MODEL: this.config.model,
+    }, '大模型中转站');
+    const instructions = `Assess whether this B2B company is a credible potential customer for MEAN WELL power supplies.
+Use only the supplied Apollo company metadata and official website evidence. Do not invent facts.
+The Liverno candidateName is an unverified discovery label derived from a search result. It may be a
+product name, page title, category, text fragment, or incomplete company name. It is informational only.
+When the registrable domains have matched, treat the Apollo organization name as the more reliable
+company identity. A candidateName differing from the Apollo name alone is not an identity conflict
+and must not by itself cause reviewRequired=true.
+Judge the company's actual business, products, applications, and plausible use or purchase of
+industrial power supplies from Apollo metadata and official website evidence.
+Power/electronics distribution, industrial automation and controls, LED drivers, system integration,
+telecom/security, renewable-energy equipment, and equipment with electrical controls can be relevant.
+Do not qualify a company merely because it uses electricity or mentions MEAN WELL.
+If identity or business evidence is insufficient or conflicting, set qualified=null and reviewRequired=true.
+Do not draft an email, include contact identity, or output email content.
+Return one JSON object matching this schema exactly: ${JSON.stringify(companyQualificationSchema)}`;
+    const identifier = crypto.createHash('sha256').update(String(researchId)).digest('hex').slice(0, 32);
+    let endpoint;
+    let payload;
+    if (this.config.apiStyle === 'chat_completions') {
+      endpoint = '/chat/completions';
+      payload = {
+        model: this.config.model,
+        messages: [
+          { role: 'system', content: instructions },
+          { role: 'user', content: input },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 1800,
+        user: identifier,
+      };
+    } else if (this.config.apiStyle === 'responses') {
+      endpoint = '/responses';
+      payload = {
+        model: this.config.model, store: false, instructions, input,
+        reasoning: { effort: this.config.reasoningEffort },
+        text: { format: { type: 'json_schema', name: 'company_qualification',
+          strict: true, schema: companyQualificationSchema } },
+        max_output_tokens: 1800, safety_identifier: identifier,
+      };
+    } else {
+      throw new AppError('OPENAI_API_STYLE 只支持 chat_completions 或 responses', {
+        status: 503, code: 'CONFIG_INVALID',
+      });
+    }
+    const response = await this.fetch(`${this.config.baseUrl}${endpoint}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${this.config.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(90_000),
+    });
+    const data = await readJsonResponse(response, '大模型中转站');
+    return parseQualification(endpoint === '/responses' ? extractOutputText(data) : extractChatText(data));
   }
 
   async createOutboundDraft({ instructions, input, customerId, researchWebsite = false }) {

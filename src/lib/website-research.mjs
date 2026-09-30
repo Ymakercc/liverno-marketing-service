@@ -3,7 +3,42 @@ import net from 'node:net';
 import { normalizeDomain } from './apollo-client.mjs';
 
 const MAX_HTML_LENGTH = 750_000;
+const MAX_HTML_BYTES = 1_000_000;
 const MAX_EVIDENCE_LENGTH = 12_000;
+
+class WebsiteResponseTooLargeError extends Error {
+  constructor() {
+    super('官网响应超过 1 MB 上限');
+  }
+}
+
+async function readLimitedHtml(response) {
+  const length = Number(response.headers.get('content-length'));
+  if (Number.isFinite(length) && length > MAX_HTML_BYTES) {
+    await response.body?.cancel().catch(() => {});
+    throw new WebsiteResponseTooLargeError();
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let html = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_HTML_BYTES) throw new WebsiteResponseTooLargeError();
+      html += decoder.decode(value, { stream: true });
+    }
+    return (html + decoder.decode()).slice(0, MAX_HTML_LENGTH);
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+}
 const RELEVANCE_TERMS = [
   'mean well', 'meanwell', 'power supply', 'power supplies', 'switching power',
   'industrial automation', 'automation', 'electrical', 'electronics', 'control cabinet',
@@ -139,12 +174,13 @@ export async function researchWebsite(
         if (contentType && !/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
           throw new Error(`不支持的官网内容类型：${contentType}`);
         }
-        const html = (await response.text()).slice(0, MAX_HTML_LENGTH);
+        const html = await readLimitedHtml(response);
         return extractWebsiteEvidence(html, current.toString());
       }
       throw new Error('官网重定向次数过多');
     } catch (error) {
       lastError = error.message;
+      if (error instanceof WebsiteResponseTooLargeError) break;
     }
   }
   return {

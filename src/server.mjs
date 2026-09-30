@@ -27,6 +27,7 @@ import { DraftService } from './services/draft-service.mjs';
 import { EnrichmentService } from './services/enrichment-service.mjs';
 import { MarketingService } from './services/marketing-service.mjs';
 import { ResearchService } from './services/research-service.mjs';
+import { QualificationService } from './services/qualification-service.mjs';
 import { MailboxMonitor } from './services/mailbox-monitor.mjs';
 import { getRelaySettings, updateRelaySettings } from './lib/relay-settings.mjs';
 import { getMarketingSettings, updateMarketingSettings } from './lib/marketing-settings.mjs';
@@ -71,6 +72,7 @@ const enrichment = new EnrichmentService({ apollo, fumeng, marketing: marketingS
 const research = new ResearchService({
   store: researchStore, apollo, config, maxMatches: config.research.maxMatches,
 });
+const qualification = new QualificationService({ store: researchStore, openai });
 const marketing = new MarketingService({
   fumeng, enrichment, drafts, marketing: marketingStore, brevo, delivery, feishu, config, priceCatalog,
   onResearchPaused: ({ reason }) => updateMarketingSettings(config, {
@@ -313,6 +315,12 @@ async function handleApi(request, response, url) {
   if (request.method === 'POST' && url.pathname === '/api/research/intake') {
     const result = await research.intake(await readBody(request));
     return sendJson(response, result.created ? 201 : 200, result.record);
+  }
+
+  const qualifyMatch = url.pathname.match(/^\/api\/research\/([^/]+)\/qualify$/);
+  if (request.method === 'POST' && qualifyMatch) {
+    const record = await qualification.qualify(decodeURIComponent(qualifyMatch[1]));
+    return sendJson(response, 200, record);
   }
 
   const researchBySource = url.pathname.match(/^\/api\/research\/by-source\/([^/]+)\/([^/]+)$/);

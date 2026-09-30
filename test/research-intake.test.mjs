@@ -265,8 +265,15 @@ test('HTTP intake requires Automation Bearer and never touches marketing jobs or
     method: 'POST', headers: { authorization: 'Bearer wrong' }, body: JSON.stringify(input()),
   });
   assert.equal(wrong.status, 401);
+  const qualifyUrl = `${base}/api/research/${SOURCE_ID}/qualify`;
+  assert.equal((await fetch(qualifyUrl, { method: 'POST' })).status, 401);
+  assert.equal((await fetch(qualifyUrl, {
+    method: 'POST', headers: { authorization: 'Bearer wrong' },
+  })).status, 401);
+  assert.equal((await fetch(`${base}/api/research/${SOURCE_ID}`)).status, 401);
   assert.equal(upstreamCalls.length, 0);
   const headers = { authorization: 'Bearer research-test-token', 'content-type': 'application/json' };
+  assert.equal((await fetch(qualifyUrl, { method: 'POST', headers })).status, 404);
   const first = await fetch(url, { method: 'POST', headers, body: JSON.stringify(input()) });
   assert.equal(first.status, 201);
   const created = await first.json();

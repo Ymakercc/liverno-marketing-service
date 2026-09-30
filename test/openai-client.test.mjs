@@ -101,3 +101,31 @@ test('relay client retries when structured output contains internal reasoning te
   assert.equal(calls, 2);
   assert.equal(result.qualificationReason, draft.qualificationReason);
 });
+
+test('qualification-only request uses its own schema and never asks for email content', async () => {
+  let calls = 0;
+  const client = new OpenAIClient(
+    { baseUrl: 'https://relay.example/v1', apiKey: 'fake-key', model: 'relay-model',
+      apiStyle: 'chat_completions' },
+    { fetchImpl: async (url, options) => {
+      calls += 1;
+      assert.equal(url, 'https://relay.example/v1/chat/completions');
+      const body = JSON.parse(options.body);
+      assert.equal(body.response_format.type, 'json_object');
+      assert.match(body.messages[0].content, /qualificationReason/);
+      assert.match(body.messages[0].content, /unverified discovery label derived from a search result/);
+      assert.match(body.messages[0].content, /candidateName differing from the Apollo name alone is not an identity conflict/);
+      assert.doesNotMatch(body.messages[0].content, /emailSubject|emailBody/);
+      assert.doesNotMatch(JSON.stringify(body), /createOutboundDraft|recipient email/i);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        qualified: true, reviewRequired: false, qualificationReason: 'Industrial fit',
+        country: '', region: 'Europe', industry: 'Automation', customerType: 'distributor',
+        customerProfile: 'Controls supplier', painPoints: [], recommendedProducts: [], riskFlags: [],
+      }) } }] }), { status: 200 });
+    } },
+  );
+  const result = await client.qualifyCompany({ input: '{}', researchId: 'research-1' });
+  assert.equal(result.qualified, true);
+  assert.equal(calls, 1);
+  assert.equal('emailBody' in result, false);
+});
