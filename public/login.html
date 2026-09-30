@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="KULON 营销控制台登录" />
+    <title>登录 · KULON 营销控制台</title>
+    <link rel="stylesheet" href="/login.css" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="login-panel" aria-labelledby="login-title">
+        <header class="login-brand">
+          <img src="/assets/kulon-logo.png" alt="KULON" />
+          <span><strong>营销控制台</strong><small>AI OUTBOUND</small></span>
+        </header>
+        <div class="login-heading">
+          <p id="login-eyebrow">安全访问</p>
+          <h1 id="login-title">登录营销控制台</h1>
+          <span id="login-description">请输入你设置的网页访问密码。</span>
+        </div>
+        <form id="login-form" class="login-form">
+          <label for="login-password">登录密码</label>
+          <input id="login-password" name="password" type="password" minlength="8" maxlength="256" autocomplete="current-password" required autofocus />
+          <div id="confirm-field" class="confirm-field hidden">
+            <label for="login-password-confirm">确认密码</label>
+            <input id="login-password-confirm" name="confirmPassword" type="password" minlength="8" maxlength="256" autocomplete="new-password" />
+          </div>
+          <p id="login-message" class="login-message" role="status"></p>
+          <button id="login-submit" type="submit">登录</button>
+        </form>
+        <footer>网页登录不会影响 n8n 后台营销和 Brevo 状态回传。</footer>
+      </section>
+    </main>
+    <script src="/login.js" defer></script>
+  </body>
+</html>

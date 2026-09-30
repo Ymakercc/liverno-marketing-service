@@ -1,0 +1,41 @@
+{
+  "name": "kulon-marketing-console",
+  "version": "2.0.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "description": "Unified KULON console for Fumeng customers, AI-assisted email review, Feishu records, and guarded delivery planning",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "dev": "node --watch src/server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "brevo:webhook": "node scripts/register-brevo-webhook.mjs",
+    "brevo:gateway": "node scripts/brevo-webhook-gateway.mjs",
+    "brevo:tunnel": "node scripts/run-brevo-tunnel.mjs",
+    "start:tracking": "node scripts/start-tracking-stack.mjs",
+    "smoke:fumeng": "node scripts/fumeng-smoke-test.mjs",
+    "smoke:relay": "node scripts/relay-smoke-test.mjs",
+    "smoke:apollo": "node scripts/apollo-smoke-test.mjs",
+    "pilot:10": "node scripts/run-validation-pilot.mjs",
+    "pilot:audit": "node scripts/audit-validation-run.mjs",
+    "feishu:backfill-screening": "node scripts/backfill-screening-outcomes.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "n8n:validate": "node scripts/validate-n8n-workflows.mjs",
+    "n8n:prepare-import": "node scripts/prepare-n8n-import.mjs",
+    "feishu:backfill-research": "node scripts/backfill-feishu-research.mjs",
+    "feishu:backfill-delivery": "node scripts/backfill-feishu-delivery.mjs",
+    "feishu:dedupe-companies": "node scripts/dedupe-feishu-companies.mjs",
+    "feishu:remove-send-permission": "node scripts/remove-feishu-send-permission-field.mjs",
+    "marketing:refresh-queued-html": "node scripts/refresh-queued-email-html.mjs",
+    "marketing:reschedule-timezones": "node scripts/reschedule-timezone-queue.mjs",
+    "marketing:requeue-image-blocked": "node scripts/requeue-image-blocked-drafts.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "countries-and-timezones": "3.10.0",
+    "imapflow": "^1.7.8",
+    "mailparser": "^3.9.20",
+    "sanitize-html": "^2.17.7"
+  }
+}

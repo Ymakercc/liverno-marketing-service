@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="MEAN WELL KULON 外贸 AI 营销控制台" />
+    <title>KULON 营销控制台</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#dashboard" aria-label="KULON 营销控制台首页">
+          <img src="/assets/kulon-logo.png" alt="KULON" />
+          <span><strong>营销控制台</strong><small>AI OUTBOUND</small></span>
+        </a>
+        <nav class="main-nav" aria-label="主导航">
+          <p class="nav-group-label">工作台</p>
+          <button class="nav-item is-active" type="button" data-view="dashboard" aria-label="营销总览"><span class="nav-icon" aria-hidden="true">⌂</span><span>营销总览</span></button>
+          <button class="nav-item" type="button" data-view="customers" aria-label="客户池"><span class="nav-icon" aria-hidden="true">◎</span><span>客户池</span><span id="nav-customer-count" class="nav-count">0</span></button>
+          <button class="nav-item" type="button" data-view="review" aria-label="AI 草稿预览"><span class="nav-icon" aria-hidden="true">✦</span><span>AI 草稿预览</span></button>
+          <button class="nav-item" type="button" data-view="queue" aria-label="发送队列"><span class="nav-icon" aria-hidden="true">→</span><span>发送队列</span></button>
+          <button class="nav-item" type="button" data-view="delivery" aria-label="邮件状态"><span class="nav-icon" aria-hidden="true">@</span><span>邮件状态</span><span id="nav-delivery-count" class="nav-count">0</span></button>
+          <button class="nav-item" type="button" data-view="inbox" aria-label="询盘回复"><span class="nav-icon" aria-hidden="true">↩</span><span>询盘回复</span><span id="nav-inbox-count" class="nav-count">0</span></button>
+          <p class="nav-group-label">内容与帮助</p>
+          <button class="nav-item" type="button" data-view="templates" aria-label="邮件模板"><span class="nav-icon" aria-hidden="true">▤</span><span>邮件模板</span></button>
+          <button class="nav-item" type="button" data-view="guide" aria-label="使用说明"><span class="nav-icon" aria-hidden="true">?</span><span>使用说明</span></button>
+        </nav>
+        <div class="sidebar-bottom">
+          <button class="nav-item" type="button" data-view="integrations" aria-label="系统连接"><span class="nav-icon" aria-hidden="true">⚙</span><span>系统连接</span></button>
+          <div class="operator"><span class="operator-avatar">KT</span><span><strong>KULON TEAM</strong><small><i></i>基础自动营销</small></span></div>
+        </div>
+      </aside>
+
+      <div class="app-main">
+        <header class="topbar">
+          <div class="breadcrumb"><span>外贸营销</span><strong id="page-breadcrumb">营销总览</strong></div>
+          <div class="topbar-actions">
+            <label class="global-search" for="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="搜索客户、国家或联系人" autocomplete="off" /></label>
+            <span class="pilot-badge"><i></i>每日最多 <span data-daily-limit>配置限额</span> 封</span>
+            <button id="logout-button" class="button button-quiet topbar-logout" type="button" title="退出登录" aria-label="退出登录"><span aria-hidden="true">↪</span><span>退出</span></button>
+          </div>
+        </header>
+
+        <main class="content">
+          <section id="view-dashboard" class="view is-active" data-view-panel="dashboard">
+            <div class="page-heading">
+              <div><p class="eyebrow">营销运营</p><h1>营销总览</h1><p>后台自动筛选、背调、发送并回传结果，你只需要查看每日邮件状态和询盘。</p></div>
+              <div class="heading-actions"><button class="button button-secondary" type="button" data-go="customers"><span aria-hidden="true">◎</span>查看客户池</button><button class="button button-primary" type="button" id="start-pilot"><span aria-hidden="true">→</span>查看今日结果</button></div>
+            </div>
+            <div class="metric-grid" aria-label="营销关键指标">
+              <article class="metric-card"><div class="metric-label"><span>孚盟客户</span><i class="metric-icon green">◎</i></div><strong id="metric-customers">-</strong><small id="metric-customer-note">正在读取孚盟</small></article>
+              <article class="metric-card metric-progress-card"><div class="metric-label"><span>客户池累计进度</span><i class="metric-icon blue">↗</i></div><div class="metric-progress-values"><span><strong id="metric-researched-total">0</strong><small>已背调</small></span><span><strong id="metric-marketed-total">0</strong><small>已营销</small></span></div><small>已营销 = 至少成功发送 1 封邮件</small></article>
+              <article class="metric-card"><div class="metric-label"><span>待背调候选</span><i class="metric-icon amber">✓</i></div><strong id="metric-candidates">-</strong><small>排除成交、停业与拒联，精准度由背调判断</small></article>
+              <article class="metric-card"><div class="metric-label"><span>今日营销公司</span><i class="metric-icon green">→</i></div><strong id="metric-marketed">0</strong><small>实际数量，随有效联系人自动变化</small></article>
+              <article class="metric-card"><div class="metric-label"><span>待发送队列</span><i class="metric-icon blue">→</i></div><strong id="metric-review">0</strong><small>已通过自动质量检查</small></article>
+              <article class="metric-card"><div class="metric-label"><span>今日已发送</span><i class="metric-icon gray">→</i></div><strong><span id="metric-sent">0</span> <em>/ <span data-daily-limit>配置限额</span></em></strong><small>按邮箱数量控制发送限额</small></article>
+              <article class="metric-card"><div class="metric-label"><span>目标待补全</span><i class="metric-icon amber">…</i></div><strong id="metric-pending">0</strong><small>客户值得营销，但联系人或证据尚未补齐</small></article>
+              <article class="metric-card"><div class="metric-label"><span>明确排除</span><i class="metric-icon red">×</i></div><strong id="metric-excluded">0</strong><small>有可靠证据确认业务不相关</small></article>
+            </div>
+            <section class="daily-company-control"><div><p class="eyebrow">自动营销计划</p><h2>每日营销数量</h2><p>背调和发信分别运行。Apollo 额度耗尽时只暂停新增背调，已经排队的邮件仍按每天 300 封继续发送。</p></div><div class="company-target-control"><label for="daily-company-limit">每日营销公司数<small>目标上限</small></label><div class="company-target-input"><input id="daily-company-limit" type="number" min="1" max="300" step="1" value="300"><button class="button button-secondary" type="submit" form="daily-company-form">保存</button></div><small id="daily-company-status">实际数量取决于精准客户和已验证联系人</small><form id="daily-company-form" hidden></form></div><div class="email-quota-display"><strong id="daily-email-limit">300</strong><span>封 / 日</span><small>实际发送上限</small></div><div class="marketing-toggle"><span class="eyebrow">营销总开关</span><button id="marketing-toggle" class="marketing-toggle-button is-paused" type="button" aria-pressed="false" aria-label="开启自动营销"><span class="toggle-dot" aria-hidden="true"></span><span id="marketing-toggle-label">开启营销</span></button><small id="marketing-toggle-status">当前已暂停，不会新增背调或发送</small></div><div class="marketing-toggle"><span class="eyebrow">Apollo 背调</span><button id="apollo-research-toggle" class="marketing-toggle-button is-paused" type="button" aria-pressed="false" aria-label="开启 Apollo 背调"><span class="toggle-dot" aria-hidden="true"></span><span id="apollo-research-toggle-label">开启背调</span></button><small id="apollo-research-toggle-status">当前已暂停，不会消耗 Apollo 额度</small></div><div class="marketing-toggle"><span class="eyebrow">Brevo 邮箱发送</span><button id="email-sending-toggle" class="marketing-toggle-button is-paused" type="button" aria-pressed="false" aria-label="开启邮箱发送"><span class="toggle-dot" aria-hidden="true"></span><span id="email-sending-toggle-label">开启发信</span></button><small id="email-sending-toggle-status">当前已关闭，不会真正发信</small></div><div class="daily-company-totals"><div><strong id="companies-marketed-today">0</strong><span>今日已营销公司</span></div><div><strong id="emails-queued-today">0</strong><span>今日已排队邮箱</span></div><div><strong id="companies-researched-today">0</strong><span>今日已背调公司</span></div><div><strong id="companies-researched-total">0</strong><span>累计背调公司</span></div><div id="feishu-research-audit-card"><strong id="feishu-research-audit">0 / 0</strong><span>飞书背调留痕</span></div><div><strong id="research-remaining-today">0</strong><span>今日内部背调余量</span></div><div><strong id="emails-remaining-today">0</strong><span>剩余邮箱额度</span></div></div></section>
+            <section class="process-section">
+              <div class="section-heading"><div><p class="eyebrow">工作流程</p><h2>当前营销流程</h2></div><span id="automation-refresh-status" class="mode-label">后台自动运行 · 状态读取中</span></div>
+              <div class="process-track">
+                <button class="process-step is-ready" type="button" data-go="customers"><span class="step-number">1</span><span><strong>孚盟客户</strong><small>排除成交、停业与拒联</small></span><b id="process-customers">-</b></button><span class="process-arrow">›</span>
+                <button class="process-step" type="button" data-go="queue"><span class="step-number">2</span><span><strong>Apollo 补全</strong><small>公司、联系人与已验证邮箱</small></span><b id="process-ai">0</b></button><span class="process-arrow">›</span>
+                <button class="process-step" type="button" data-go="queue"><span class="step-number">3</span><span><strong>AI 生成</strong><small>自动质检后进入队列</small></span><b id="process-review">0</b></button><span class="process-arrow">›</span>
+                <button class="process-step" type="button" data-go="queue"><span class="step-number">4</span><span><strong>定时发送</strong><small>按客户当地工作时间</small></span><b>0</b></button><span class="process-arrow">›</span>
+                <button class="process-step" type="button" data-go="delivery"><span class="step-number">5</span><span><strong>结果追踪</strong><small>送达、退信、回复与停止</small></span><b id="process-results">0</b></button>
+              </div>
+            </section>
+            <div class="dashboard-grid">
+              <section class="work-section"><div class="section-heading compact"><div><p class="eyebrow">下一步</p><h2>优先处理</h2></div><button class="text-button" type="button" data-go="customers">查看全部 <span>→</span></button></div><div id="priority-list" class="priority-list"><div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div></div></section>
+              <aside class="activity-section"><div class="section-heading compact"><div><p class="eyebrow">系统状态</p><h2>运行状态</h2></div></div><div id="system-status-list" class="status-list"></div><button class="button button-secondary full-width" type="button" data-go="integrations">检查所有连接</button></aside>
+            </div>
+            <section class="screening-section pending-section"><div class="section-heading compact"><div><p class="eyebrow">继续处理</p><h2>营销目标待补全</h2></div><span id="pending-summary" class="mode-label">暂无待补全记录</span></div><div id="pending-list" class="screening-list"><div class="empty-inline"><strong>今天没有待补全客户</strong><p>缺少联系人、邮箱未验证或资料待核验的目标客户会显示在这里。</p></div></div></section>
+            <section class="screening-section exclusion-section"><div class="section-heading compact"><div><p class="eyebrow">今日筛选结果</p><h2>明确排除的客户</h2></div><span id="excluded-summary" class="mode-label muted">暂无排除记录</span></div><div id="excluded-list" class="screening-list"><div class="empty-inline"><strong>今天还没有明确排除客户</strong><p>只有可靠证据确认业务不相关的客户才会显示在这里。</p></div></div></section>
+            <div class="safety-notice"><span class="notice-icon">!</span><div><strong>试运行护栏已开启</strong><p>每日硬上限按邮箱数量控制；同一家公司最多发送 5 个不同联系人。系统会自动记录飞书、发送邮件并回传状态；退信、退订或投诉后自动停止。</p></div><button class="text-button" type="button" data-go="queue">查看规则 →</button></div>
+          </section>
+
+          <section id="view-customers" class="view" data-view-panel="customers">
+            <div class="page-heading"><div><p class="eyebrow">孚盟 CRM</p><h1>客户池</h1><p>从孚盟读取客户及联系人，先筛选再进入 AI 分析。</p></div><button id="reload-customers" class="button button-secondary" type="button"><span aria-hidden="true">↻</span>同步孚盟</button></div>
+            <div class="filter-bar"><label class="table-search"><span aria-hidden="true">⌕</span><input id="customer-search" type="search" placeholder="搜索公司、编号、所属人或联系人" /></label><select id="customer-scope-filter" aria-label="客户范围"><option value="public">营销公海池</option><option value="private">其他所属人客户</option><option value="all">全部客户</option></select><select id="customer-owner-filter" aria-label="所属人"><option value="all">全部所属人</option></select><select id="customer-country-filter" aria-label="国家或地区"><option value="all">全部国家/地区</option></select><select id="customer-industry-filter" aria-label="行业"><option value="all">全部行业</option></select><select id="customer-state-filter" aria-label="客户状态"><option value="all">全部客户状态</option><option value="eligible">可进入背调</option><option value="missing">未填写状态</option><option value="1">线索</option><option value="2">意向</option><option value="3">成交</option><option value="5">停业</option><option value="6">拒联</option></select><select id="customer-contact-filter" aria-label="联系人邮箱"><option value="all">全部邮箱情况</option><option value="email">有主邮箱</option><option value="missing">缺少主邮箱</option></select><span id="customer-meta" class="filter-result">尚未读取</span></div>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th data-sort-column="company" aria-sort="none"><button class="sort-button" type="button" data-sort="company"><span>公司 / 编号</span><i aria-hidden="true">↕</i></button></th><th data-sort-column="owner" aria-sort="none"><button class="sort-button" type="button" data-sort="owner"><span>所属人</span><i aria-hidden="true">↕</i></button></th><th data-sort-column="country" aria-sort="none"><button class="sort-button" type="button" data-sort="country"><span>国家/地区</span><i aria-hidden="true">↕</i></button></th><th data-sort-column="state" aria-sort="none"><button class="sort-button" type="button" data-sort="state"><span>客户状态</span><i aria-hidden="true">↕</i></button></th><th data-sort-column="industry" aria-sort="none"><button class="sort-button" type="button" data-sort="industry"><span>行业</span><i aria-hidden="true">↕</i></button></th><th data-sort-column="contact" aria-sort="none"><button class="sort-button" type="button" data-sort="contact"><span>主联系人</span><i aria-hidden="true">↕</i></button></th><th data-sort-column="lastTrack" aria-sort="none"><button class="sort-button" type="button" data-sort="lastTrack"><span>最后跟进</span><i aria-hidden="true">↕</i></button></th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="customer-table-body"></tbody></table><div id="customer-empty" class="table-empty hidden">没有符合当前条件的客户</div></div>
+            <button id="load-more" class="button button-quiet load-more" type="button">加载下一批客户</button>
+          </section>
+
+          <section id="view-review" class="view" data-view-panel="review">
+            <div class="page-heading"><div><p class="eyebrow">单客户预览</p><h1>AI 草稿预览</h1><p>这里用于临时查看和编辑单封邮件，自动营销主流程不需要你逐条操作。</p></div><span id="review-model" class="model-chip">模型检查中</span></div>
+            <div id="review-empty" class="empty-workspace"><span class="empty-symbol">✦</span><h2>还没有选择客户</h2><p>从客户池选择一家公司，核对联系人后再生成开发信。</p><button class="button button-primary" type="button" data-go="customers">进入客户池</button></div>
+            <div id="review-workspace" class="review-workspace hidden">
+              <section class="review-context"><div class="section-heading compact"><div><p class="eyebrow">当前客户</p><h2 id="review-customer-name"></h2></div><button class="text-button" type="button" data-go="customers">更换客户</button></div><div id="review-customer-facts" class="fact-strip"></div><div class="contact-controls"><label for="contact-select">收件联系人</label><select id="contact-select"></select><button id="generate-draft" class="button button-primary" type="button"><span aria-hidden="true">✦</span>生成 AI 草稿</button></div><label id="research-option" class="check-control hidden"><input id="research-website" type="checkbox" /><span>允许 AI 研究客户官网</span></label></section>
+              <div id="draft-loading" class="draft-loading hidden"><span class="spinner"></span><div><strong>AI 正在准备客户分析</strong><small>生成客户画像、产品建议和首封邮件</small></div></div>
+              <div id="draft-result" class="draft-layout hidden">
+                <aside class="analysis-panel"><div class="qualification"><span id="qualification-badge"></span><h3 id="qualification-title"></h3><p id="qualification-reason"></p></div><dl id="profile-facts" class="profile-facts"></dl><section><p class="eyebrow">客户画像</p><p id="customer-profile"></p></section><section><p class="eyebrow">推荐产品</p><div id="recommended-products"></div></section><section><p class="eyebrow">风险检查</p><div id="draft-warnings" class="draft-warnings"></div></section></aside>
+                <section class="email-editor"><div class="editor-heading"><div><p class="eyebrow">邮件草稿</p><h2>首封轻量开发信</h2></div><span id="model-name" class="model-name"></span></div><label for="email-subject">邮件主题</label><input id="email-subject" type="text" /><label for="email-body">邮件正文</label><textarea id="email-body" rows="12"></textarea><div class="mail-preview"><div class="mail-meta"><span>Subject</span><strong id="preview-subject"></strong></div><div id="preview-message" class="preview-message"></div><div class="compact-signature"><strong id="signature-team-name">MEAN WELL KULON TEAM</strong><span>Email <a id="signature-email" href="mailto:marketing@kulon.com">marketing@kulon.com</a></span><span>Website <a id="signature-website" href="https://meanwell-led.com/" target="_blank" rel="noopener">meanwell-led.com</a></span></div></div><div class="editor-actions"><span id="sync-status">尚未写入飞书</span><button id="sync-feishu" class="button button-primary" type="button">写入飞书并排队</button></div></section>
+              </div>
+            </div>
+          </section>
+
+          <section id="view-queue" class="view" data-view-panel="queue">
+            <div class="page-heading"><div><p class="eyebrow">发送控制</p><h1>发送队列</h1><p>Apollo 补全、孚盟回填和 AI 质检通过后自动排期，n8n 负责后台执行。</p></div><span class="mode-label muted">环境开关控制发送</span></div>
+            <div class="queue-summary queue-only"><div><span>已补全</span><strong id="queue-pending">0</strong></div><div><span>待发送</span><strong id="queue-approved">0</strong></div><div><span>累计已发送</span><strong id="queue-sent">0</strong></div></div>
+            <section class="queue-board"><div class="queue-rules"><div class="section-heading compact"><div><p class="eyebrow">试运行规则</p><h2>发送护栏</h2></div></div><ul><li><span>每日发送上限</span><strong><span data-daily-limit>配置限额</span> 封</strong></li><li><span>同一公司</span><strong>最多 5 个联系人</strong></li><li><span>客户冷却期</span><strong>7 天</strong></li><li><span>发送前置条件</span><strong>有效客户与关键联系人</strong></li><li><span>停止条件</span><strong>退信 / 退订 / 投诉</strong></li></ul></div><div class="queue-list-section"><div class="section-heading compact"><div><p class="eyebrow">自动化队列</p><h2>营销任务</h2></div><button id="refresh-queue" class="text-button" type="button">刷新</button></div><div id="queue-list" class="empty-inline"><strong>队列为空</strong><p>n8n 准备完成首个客户后，任务会出现在这里。</p></div></div></section>
+          </section>
+
+          <section id="view-delivery" class="view" data-view-panel="delivery">
+            <div class="page-heading">
+              <div><p class="eyebrow">Brevo 实时事件</p><h1>邮件状态</h1><p>集中查看每封营销邮件的发送、送达、打开、点击、退信和停止状态。</p></div>
+              <div class="heading-actions"><span id="delivery-webhook-state" class="connection-chip">检查中</span><button id="refresh-delivery" class="button button-secondary" type="button"><span aria-hidden="true">↻</span>刷新状态</button></div>
+            </div>
+            <div class="queue-summary delivery-summary"><div><span>当前分类发送</span><strong id="delivery-today">0</strong></div><div><span>当前分类追踪</span><strong id="delivery-total">0</strong></div><div><span>已送达</span><strong id="delivery-delivered">0</strong></div><div><span>已打开</span><strong id="delivery-opened">0</strong></div><div><span>已点击</span><strong id="delivery-clicked">0</strong></div><div><span>异常 / 停止</span><strong id="delivery-failed">0</strong></div></div>
+            <section class="second-touch-strip" aria-label="第二轮营销状态">
+              <div class="second-touch-title"><p class="eyebrow">SECOND TOUCH</p><h2>第二轮营销</h2><span id="second-touch-state" class="connection-chip waiting">试运行</span></div>
+              <div class="second-touch-metrics"><div><span>符合条件</span><strong id="second-touch-eligible">0</strong></div><div><span>已排队</span><strong id="second-touch-queued">0</strong></div><div><span>已发送</span><strong id="second-touch-sent">0</strong></div><div><span>试运行剩余</span><strong id="second-touch-remaining">0</strong></div></div>
+            </section>
+            <section class="delivery-panel">
+              <div class="section-heading compact delivery-section-heading">
+                <div><p class="eyebrow">状态明细</p><h2>邮件与收件人</h2></div>
+                <div class="screening-batch-summary">
+                  <div class="screening-batch-title"><label for="screening-batch-select">筛选统计</label><select id="screening-batch-select" aria-label="选择筛选批次"><option value="today">今日累计</option></select></div>
+                  <div class="screening-batch-metrics">
+                    <span><strong id="screening-researched">0</strong><small>背调公司</small></span>
+                    <span><strong id="screening-qualified">0</strong><small>精准客户</small></span>
+                    <span><strong id="screening-excluded">0</strong><small>明确排除</small></span>
+                    <span><strong id="screening-pending">0</strong><small>待补全</small></span>
+                    <span><strong id="screening-contacts-found">0</strong><small>找到联系人</small></span>
+                    <span><strong id="screening-contacts-created">0</strong><small>新增孚盟</small></span>
+                    <span><strong id="screening-queued-companies">0</strong><small>进入营销</small></span>
+                    <span><strong id="screening-queued-emails">0</strong><small>排队邮件</small></span>
+                  </div>
+                </div>
+                <div class="delivery-tools"><select id="delivery-campaign-filter" aria-label="筛选营销轮次"><option value="all">全部营销轮次</option><option value="initial_outreach_v1">首封营销</option><option value="second_touch_v1">第二轮营销</option></select><select id="delivery-period-filter" aria-label="筛选发送时间"><option value="today">今天已发送</option><option value="yesterday">昨天已发送</option><option value="last24h">最近24小时</option><option value="last7d">最近7天</option><option value="all">全部已发送</option></select><select id="delivery-status-filter" aria-label="筛选邮件状态"><option value="all">全部状态</option><option value="accepted">Brevo 已接收</option><option value="sent">已发送</option><option value="delivered">已送达</option><option value="opened">已打开</option><option value="clicked">已点击</option><option value="deferred">延迟投递</option><option value="soft_bounce">软退信</option><option value="invalid_email">无效邮箱</option><option value="hard_bounce">硬退信</option><option value="blocked">被拦截</option><option value="spam">垃圾邮件投诉</option><option value="unsubscribed">已退订</option><option value="error">发送错误</option></select><select id="delivery-sort" aria-label="邮件排序方式"><option value="sent_desc">最新发送优先</option><option value="opens_desc">打开次数最多</option><option value="clicks_desc">点击次数最多</option></select></div>
+              </div>
+              <div class="delivery-period-summary"><div><span>当前范围</span><strong id="delivery-period-label">今天已发送</strong></div><div><span>发送邮箱</span><strong id="delivery-period-emails">0</strong></div><div><span>发送公司</span><strong id="delivery-period-companies">0</strong></div><div><span>发送时间</span><strong id="delivery-period-window">-</strong></div></div>
+              <div class="delivery-slot-heading"><div><p id="delivery-list-eyebrow" class="eyebrow">发送时段</p><strong id="delivery-list-title">每 15 分钟一组</strong></div><div class="delivery-slot-actions"><span id="delivery-list-note">按实际发送时间 · 北京时间</span><button id="toggle-delivery-slots" class="button button-quiet delivery-expand-button" type="button" aria-pressed="false"><span aria-hidden="true">↕</span><span id="toggle-delivery-slots-label">展开全部</span></button></div></div>
+              <div id="delivery-slot-list" class="delivery-slot-list"></div>
+              <div id="delivery-empty" class="empty-inline hidden"><strong>当前筛选条件下没有邮件</strong><p>邮件发送成功后会先显示“已发送”，收到 Brevo 事件后继续更新状态。</p></div>
+            </section>
+          </section>
+
+          <section id="view-inbox" class="view" data-view-panel="inbox">
+            <div class="page-heading">
+              <div><p class="eyebrow">阿里企业邮箱</p><h1>询盘回复</h1><p>集中查看客户回复、退订和系统邮件；匹配到营销记录的人工回复会自动停止该联系人的后续邮件。</p></div>
+              <div class="heading-actions"><span id="inbox-monitor-state" class="connection-chip waiting">待配置</span><button id="poll-inbox" class="button button-secondary" type="button"><span aria-hidden="true">↻</span>立即检查</button></div>
+            </div>
+            <div class="queue-summary inbox-summary"><div><span>明确询盘</span><strong id="inbox-inquiries">0</strong></div><div><span>潜在意向</span><strong id="inbox-potential">0</strong></div><div><span>普通回复</span><strong id="inbox-ordinary">0</strong></div><div><span>MiMo 已分析</span><strong id="inbox-ai-classified">0</strong></div><div><span>匹配营销记录</span><strong id="inbox-matched">0</strong></div><div><span>自动回复</span><strong id="inbox-auto-replies">0</strong></div><div><span>退信通知</span><strong id="inbox-bounces">0</strong></div><div><span>无关 / 未识别</span><strong id="inbox-unmatched">0</strong></div></div>
+            <div class="inbox-filter-bar">
+              <div><p class="eyebrow">分类查看</p><strong>按邮件性质筛选记录</strong></div>
+              <div class="inbox-tools"><select id="inbox-classification-filter" aria-label="筛选回复类型"><option value="all">全部邮件</option><option value="inquiry">明确询盘</option><option value="potential_interest">潜在意向</option><option value="ordinary_reply">普通回复</option><option value="opt_out">拒绝 / 退订</option><option value="auto_reply">自动回复</option><option value="bounce">退信通知</option><option value="unrelated">无关邮件</option><option value="unmatched">未识别</option></select><button id="refresh-inbox" class="button button-quiet" type="button"><span aria-hidden="true">↻</span>刷新</button></div>
+            </div>
+            <section class="inbox-panel inbox-priority-panel">
+              <div class="section-heading compact inbox-section-heading"><div><p class="eyebrow">优先处理</p><h2>明确询盘与潜在意向</h2><p>MiMo 识别出的具体采购需求，以及值得人工确认的业务兴趣。</p></div><span id="inbox-inquiry-count" class="inbox-section-count">0 封</span></div>
+              <div id="inbox-inquiry-list" class="inbox-list"></div>
+              <div id="inbox-inquiry-empty" class="empty-inline"><strong>当前没有询盘或潜在意向</strong><p>识别到采购需求或合作兴趣后，会优先出现在这里。</p></div>
+            </section>
+            <section class="inbox-panel inbox-secondary-panel">
+              <div class="section-heading compact inbox-section-heading"><div><p class="eyebrow">辅助记录</p><h2>其他收件记录</h2><p>自动回复、退信、拒绝联系及未匹配的系统邮件。</p></div><span id="inbox-other-count" class="inbox-section-count neutral">0 封</span></div>
+              <div id="inbox-other-list" class="inbox-list"></div>
+              <div id="inbox-other-empty" class="empty-inline"><strong>当前没有其他记录</strong><p>自动回复、退信及未匹配邮件会归档到这里。</p></div>
+            </section>
+          </section>
+
+          <section id="view-templates" class="view" data-view-panel="templates">
+            <div class="page-heading"><div><p class="eyebrow">内容库</p><h1>邮件模板</h1><p>根据客户所处阶段选择内容，不把重型图片邮件用作第一次触达。</p></div><div class="heading-actions"><a class="button button-primary" href="/second-touch-preview.html" target="_blank">查看第二轮样稿 ↗</a><a class="button button-secondary" href="/email-artwork-preview.html" target="_blank">查看完整预览 ↗</a></div></div>
+            <div class="template-grid"><a class="template-card template-card-link second-touch-card" href="/second-touch-preview.html" target="_blank"><div class="template-cover second-touch-cover"><span>02</span><div><small>SECOND TOUCH</small><strong>A shorter list.<br />More relevant options.</strong></div></div><div class="template-info"><span class="template-tag preview">试运行已启用</span><h2>第二轮 · 精准型号跟进</h2><p>针对已打开首封且没有停止事件的联系人，发送 4 个行业相关型号、USD 参考价和单一回复入口。</p><b>查看完整邮件 ↗</b></div></a><article class="template-card recommended"><div class="template-cover plain"><span>01</span><div><small>FIRST TOUCH</small><strong>Power supply sourcing<br />with a practical local team.</strong></div></div><div class="template-info"><span class="template-tag">当前首封</span><h2>01 · 公司实力版</h2><p>首封自动使用：展示 KULON / MEAN WELL 的产品支持、全球合作经验和询盘入口。</p></div></article><article class="template-card"><img src="/assets/email-banners/enclosed.jpg" alt="Enclosed power supply 邮件横幅" /><div class="template-info"><span class="template-tag neutral">后续阶段</span><h2>02 · 价格参考版</h2><p>客户表达采购兴趣后，提供系列和价格参考。</p></div></article><article class="template-card"><img src="/assets/email-banners/din-rail.jpg" alt="DIN rail power supply 邮件横幅" /><div class="template-info"><span class="template-tag neutral">后续阶段</span><h2>03 · 产品分类版</h2><p>用产品分类帮助客户快速找到对应应用。</p></div></article><article class="template-card"><img src="/assets/email-banners/pcb.jpg" alt="PCB power supply 邮件横幅" /><div class="template-info"><span class="template-tag neutral">客户回复后</span><h2>04 · 询价需求版</h2><p>客户回复后收集电压、功率、认证和应用需求。</p></div></article></div>
+          </section>
+
+          <section id="view-guide" class="view" data-view-panel="guide">
+            <div class="page-heading"><div><p class="eyebrow">运行说明</p><h1>使用说明</h1><p>日常只需确认每日邮箱上限和营销开关，系统会自动处理其余流程，你只需要查看结果和处理询盘。</p></div><span class="mode-label">基础自动营销</span></div>
+            <div class="guide-layout">
+              <section class="guide-main">
+                <div class="section-heading compact"><div><p class="eyebrow">后台流程</p><h2>系统自动完成</h2></div></div>
+                <ol class="guide-steps">
+                  <li><span>1</span><div><strong>孚盟读取候选客户</strong><p>n8n 读取“公海客户”所属人下的客户，仅预先排除成交、停业和拒联；是否精准由后续背调判断。</p></div></li>
+                  <li><span>2</span><div><strong>Apollo 补全并回填</strong><p>匹配公司、搜索合适联系人、解锁已验证邮箱，只将新增或空白字段回填孚盟。</p></div></li>
+                  <li><span>3</span><div><strong>AI 生成与自动质检</strong><p>中转站模型生成首封开发信，系统检查收件人、事实、占位符、字数和合规状态。</p></div></li>
+                  <li><span>4</span><div><strong>n8n 按时区发送</strong><p>邮件进入客户当地工作时间队列，Brevo 从 marketing@kulon.com 发送。</p></div></li>
+                  <li><span>5</span><div><strong>MiMo 识别客户回复</strong><p>网页展示送达、打开、点击和退信；客户回复由小米 MiMo 区分明确询盘、潜在意向、普通回复和拒绝联系。</p><button class="text-button" type="button" data-go="inbox">查看询盘回复 →</button></div></li>
+                </ol>
+              </section>
+
+              <aside class="guide-side">
+                <section>
+                  <p class="eyebrow">试运行检查</p><h2>小批量试运行</h2>
+                  <ul class="checklist"><li><span>✓</span>除成交、停业、拒联外均可进入背调</li><li><span>✓</span>Apollo 与 AI 判断客户是否精准</li><li><span>✓</span>优先使用 Apollo 已验证邮箱</li><li><span>✓</span>每家公司最多 5 个联系人</li><li><span>✓</span>自动写入飞书并发送</li><li><span>✓</span>退信、退订或投诉后停止</li></ul>
+                </section>
+                <section>
+                  <p class="eyebrow">数据边界</p><h2>孚盟数据范围</h2>
+                  <dl class="guide-facts"><div><dt>客户资料</dt><dd>已连接</dd></div><div><dt>客户联系人</dt><dd>已连接</dd></div><div><dt>营销公海池</dt><dd>按所属人读取</dd></div><div><dt>导入状态</dt><dd>进行中</dd></div></dl>
+                  <p class="guide-note">本项目中的“公海客户”是孚盟所属人账号“公海客户”，不是孚盟系统的公海标志。页面每次同步都会读取最新总量，导入期间数量会继续增长。</p>
+                </section>
+                <section>
+                  <p class="eyebrow">访问方式</p><h2>访问地址</h2>
+                  <p class="access-line"><span>本机</span><strong>127.0.0.1:8787</strong></p><p class="access-line"><span>局域网</span><strong>192.168.2.109:8787</strong></p>
+                </section>
+              </aside>
+            </div>
+          </section>
+
+          <section id="view-integrations" class="view" data-view-panel="integrations">
+            <div class="page-heading"><div><p class="eyebrow">系统健康</p><h1>系统连接</h1><p>连接状态只显示脱敏信息；AI 配置保存在本机 .env。</p></div><button id="check-integrations" class="button button-secondary" type="button">重新检查</button></div><div id="integration-list" class="integration-list"></div>
+            <section class="relay-settings-panel security-settings-panel"><div class="section-heading compact"><div><p class="eyebrow">访问安全</p><h2>修改网页登录密码</h2></div><span class="connection-state ready">已启用</span></div><p class="settings-note">密码只保存为不可逆哈希。修改后其他设备上的登录会立即失效，需要使用新密码重新登录。</p><form id="password-settings-form" class="relay-settings-form"><label>当前密码<input id="current-password" name="currentPassword" type="password" maxlength="256" autocomplete="current-password" required></label><label>新密码<input id="new-password" name="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="256" required></label><label class="settings-wide">确认新密码<input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="256" required></label><div class="settings-actions settings-wide"><span id="password-settings-status" class="settings-note"></span><button class="button button-primary" type="submit">更新登录密码</button></div></form></section>
+            <section class="relay-settings-panel"><div class="section-heading compact"><div><p class="eyebrow">AI 配置</p><h2>OpenAI 兼容中转站</h2></div><span id="relay-key-status" class="connection-state">读取中</span></div><p class="settings-note">修改后立即作用于新生成的 AI 草稿。完整 Key 不会回显；留空表示继续使用当前 Key。</p><form id="relay-settings-form" class="relay-settings-form"><label>中转站地址<input id="relay-base-url" name="baseUrl" type="url" placeholder="https://your-relay.example/v1" required></label><label>模型名称<input id="relay-model" name="model" type="text" placeholder="模型名称" required></label><label>API 风格<select id="relay-api-style" name="apiStyle"><option value="chat_completions">Chat Completions</option><option value="responses">Responses</option></select></label><label>推理强度<select id="relay-reasoning" name="reasoningEffort"><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></label><label class="settings-wide">API Key<input id="relay-api-key" name="apiKey" type="password" placeholder="留空保持当前 Key"></label><label class="check-control settings-wide"><input id="relay-web-search" name="webSearchEnabled" type="checkbox"><span>允许官网研究时使用 Web Search（仅 Responses 风格有效）</span></label><label class="settings-wide">局域网配置令牌（仅当前会话）<input id="relay-admin-token" type="password" autocomplete="off" placeholder="仅配置 SETTINGS_ADMIN_TOKEN 后填写"></label><div class="settings-actions settings-wide"><span id="relay-settings-status" class="settings-note"></span><button class="button button-primary" type="submit">保存中转站配置</button></div></form></section>
+            <section class="relay-settings-panel mimo-settings-panel"><div class="section-heading compact"><div><p class="eyebrow">收件智能分类</p><h2>小米 MiMo 询盘识别</h2></div><span id="mimo-connection-state" class="connection-state missing">未配置</span></div><p class="settings-note">独立分析客户最新回复，输出明确询盘、潜在意向、普通回复、拒绝联系或无关邮件。完整 Key 不会回显；模型不可用时系统会保守降级。</p><form id="mimo-settings-form" class="relay-settings-form"><label>MiMo API 地址<input id="mimo-base-url" type="url" value="https://token-plan-cn.xiaomimimo.com/v1" required></label><label>分类模型<select id="mimo-model"><option value="mimo-v2.5-pro">mimo-v2.5-pro（推荐）</option><option value="mimo-v2.5">mimo-v2.5</option></select></label><label class="settings-wide">MiMo API Key<input id="mimo-api-key" type="password" autocomplete="new-password" placeholder="首次配置时填写；留空保持当前 Key"></label><label class="check-control settings-wide"><input id="mimo-enabled" type="checkbox"><span>连接测试成功后开启自动询盘识别</span></label><label class="settings-wide">局域网配置令牌（仅当前会话）<input id="mimo-admin-token" type="password" autocomplete="off" placeholder="仅配置 SETTINGS_ADMIN_TOKEN 后填写"></label><div class="settings-actions settings-wide"><span id="mimo-settings-status" class="settings-note">默认关闭</span><button class="button button-primary" type="submit">保存并测试</button></div></form></section>
+            <section class="relay-settings-panel mailbox-settings-panel"><div class="section-heading compact"><div><p class="eyebrow">收件监控</p><h2>阿里企业邮箱 IMAP</h2></div><span id="mailbox-connection-state" class="connection-state missing">未配置</span></div><p class="settings-note">填写邮箱客户端授权码，不是网页登录密码。授权码只会加密保存在本机，网页和 API 均不会回显。</p><form id="mailbox-settings-form" class="relay-settings-form"><label>IMAP 服务器<input id="mailbox-host" type="text" value="imap.qiye.aliyun.com" required></label><label>端口<input id="mailbox-port" type="number" min="1" max="65535" value="993" required></label><label>邮箱账号<input id="mailbox-username" type="email" value="marketing@kulon.com" autocomplete="username" required></label><label>收件文件夹<input id="mailbox-folder" type="text" value="INBOX" required></label><label class="settings-wide">客户端授权码<input id="mailbox-password" type="password" autocomplete="new-password" placeholder="首次配置时填写；留空保持当前授权码"></label><label class="check-control"><input id="mailbox-secure" type="checkbox" checked><span>使用 SSL / TLS</span></label><label class="check-control"><input id="mailbox-enabled" type="checkbox"><span>连接测试成功后开启自动监控</span></label><label class="settings-wide">局域网配置令牌（仅当前会话）<input id="mailbox-admin-token" type="password" autocomplete="off" placeholder="仅配置 SETTINGS_ADMIN_TOKEN 后填写"></label><div class="settings-actions settings-wide"><span id="mailbox-settings-status" class="settings-note">监控默认关闭</span><button class="button button-primary" type="submit">保存并测试</button></div></form></section>
+            <div class="architecture-band"><div><span>数据源</span><strong>孚盟 CRM</strong></div><i>→</i><div><span>客户补全</span><strong>Apollo</strong></div><i>→</i><div><span>内容生成</span><strong>OpenAI 兼容中转站</strong></div><i>→</i><div><span>后台调度</span><strong>n8n</strong></div><i>→</i><div><span>发送与追踪</span><strong>Brevo</strong></div><i>→</i><div><span>回复识别</span><strong>Xiaomi MiMo</strong></div></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <aside id="customer-drawer" class="drawer hidden" aria-label="客户详情"><div class="drawer-backdrop" data-close-drawer></div><div class="drawer-panel"><button class="drawer-close" type="button" title="关闭" aria-label="关闭" data-close-drawer>×</button><p id="drawer-code" class="eyebrow"></p><h2 id="drawer-name"></h2><a id="drawer-website" target="_blank" rel="noreferrer"></a><div id="drawer-facts" class="drawer-facts"></div><section><div class="section-heading compact"><div><p class="eyebrow">客户联系人</p><h3>联系人</h3></div></div><div id="drawer-contacts" class="drawer-contacts"></div></section><div class="drawer-actions"><button id="drawer-generate" class="button button-primary full-width" type="button"><span aria-hidden="true">✦</span>进入 AI 分析</button></div></div></aside>
+    <aside id="email-detail-drawer" class="drawer email-detail-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="email-detail-subject">
+      <div class="drawer-backdrop" data-close-email-drawer></div>
+      <div class="drawer-panel email-detail-panel">
+        <button class="drawer-close" type="button" title="关闭" aria-label="关闭邮件详情" data-close-email-drawer>×</button>
+        <div class="email-detail-heading"><div><p class="eyebrow">实际发送内容</p><h2 id="email-detail-subject">邮件详情</h2></div><span id="email-detail-status" class="delivery-status info">读取中</span></div>
+        <div class="email-detail-facts">
+          <div><span>公司</span><strong id="email-detail-company">-</strong></div>
+          <div><span>联系人 / 收件邮箱</span><strong id="email-detail-recipient">-</strong></div>
+          <div><span>最后更新</span><strong id="email-detail-time">-</strong></div>
+          <div><span>Brevo Message ID</span><strong id="email-detail-message-id">-</strong></div>
+        </div>
+        <div class="email-detail-stage">
+          <iframe id="email-detail-frame" title="实际发送的完整邮件" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+          <div id="email-detail-empty" class="email-detail-empty hidden"><strong>无正文记录</strong><p>这是一封早期测试邮件或外部发送记录，系统没有保存当时的 HTML 正文。</p></div>
+        </div>
+      </div>
+    </aside>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

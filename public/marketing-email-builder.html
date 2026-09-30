@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KULON 通用营销邮件生成器</title>
+    <link rel="stylesheet" href="/marketing-email-builder.css">
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">KULON SALES EMAIL BUILDER</p>
+        <h1>通用营销邮件生成器</h1>
+        <p>业务员自定义客户信息、邮件话术和推荐产品，页面自动生成统一风格的 HTML 图文邮件。</p>
+      </div>
+      <a href="/newlord-meanwell-email.html" target="_blank" rel="noreferrer">查看 Newlord 示例</a>
+    </header>
+
+    <main class="builder-layout">
+      <section class="editor-panel" aria-label="邮件编辑区">
+        <div class="section-title">
+          <span>01</span>
+          <h2>客户与邮件内容</h2>
+        </div>
+
+        <div class="form-grid">
+          <label>客户公司名
+            <input id="company-name" type="text" value="Newlord Nigeria Ltd">
+          </label>
+          <label>联系人称呼
+            <input id="contact-name" type="text" value="Mr. Daryanani">
+          </label>
+          <label>客户国家/市场
+            <input id="market-name" type="text" value="Nigeria">
+          </label>
+          <label>已营销次数
+            <input id="previous-count" type="number" min="0" max="20" value="2">
+          </label>
+        </div>
+
+        <label>业务员签名
+          <select id="salesperson-select"></select>
+        </label>
+
+        <label>邮件主题
+          <input id="email-subject-input" type="text" value="A focused MEAN WELL 48V shortlist for Newlord's UPS & telecom DC projects">
+        </label>
+
+        <div class="form-grid">
+          <label>头图主标题
+            <input id="hero-title" type="text" value="MEAN WELL 48V power options">
+          </label>
+          <label>绿色强调标题
+            <input id="hero-highlight" type="text" value="for UPS & telecom DC projects">
+          </label>
+          <label>跟进目的
+            <input id="next-step" type="text" value="Model shortlist">
+          </label>
+          <label>CTA 按钮文字
+            <input id="cta-label" type="text" value="Request model shortlist">
+          </label>
+        </div>
+
+        <label>开头正文
+          <textarea id="intro-copy" rows="6">Following my previous two notes about MEAN WELL, it seems this topic may be relevant to your team's UPS, telecom DC power and power-quality projects. So instead of sending a broad company introduction again, I prepared a more focused starting point for Newlord.
+
+We understand Newlord supports customers in Nigeria with UPS systems, telecom DC power systems, AVR, solar hybrid power and related power-protection solutions. MEAN WELL can be positioned as a complementary line for the smaller but frequent power supply requirements inside these projects.</textarea>
+        </label>
+
+        <label>场景卡片（每行：标题 | 说明）
+          <textarea id="application-cards" rows="5">Telecom cabinets | 48V DC bus, monitoring and retrofit loads for site cabinets.
+UPS support | Cabinet power and service spares for maintenance teams.
+Stock planning | Fast-moving SKUs for repeat enquiries and urgent quotations.</textarea>
+        </label>
+
+        <label>为什么适合客户
+          <textarea id="fit-copy" rows="4">MEAN WELL does not need to replace your existing UPS or telecom brands. It can help your team cover repeat auxiliary power requirements, local service spares, panel builds and urgent project quotations with a broader power-supply portfolio.</textarea>
+        </label>
+
+        <label>结尾问题
+          <textarea id="closing-copy" rows="3">Would a 15-minute call this week be convenient, or should I first send the shortlist in Excel for your engineering and procurement team to review internally?</textarea>
+        </label>
+
+        <div class="section-title product-section-title">
+          <span>02</span>
+          <h2>选择营销产品</h2>
+        </div>
+
+        <div class="product-search">
+          <label>搜索型号/系列
+            <input id="product-query" type="search" placeholder="例如 RSP-500, NDR, 48, HLG">
+          </label>
+          <button id="load-products" type="button">搜索</button>
+        </div>
+        <div id="catalog-meta" class="catalog-meta">正在读取产品数据...</div>
+        <div id="product-results" class="product-results" aria-live="polite"></div>
+
+        <h3 class="mini-heading">已选择产品</h3>
+        <div id="selected-products" class="selected-products"></div>
+      </section>
+
+      <section class="preview-panel" aria-label="邮件预览区">
+        <div class="preview-toolbar">
+          <div>
+            <p class="eyebrow">LIVE PREVIEW</p>
+            <h2>最终邮件展示</h2>
+            <span id="subject-preview"></span>
+          </div>
+          <div class="copy-actions">
+            <button id="copy-rich-email" type="button">复制图文邮件</button>
+            <button id="copy-html-source" type="button">复制HTML源码</button>
+          </div>
+        </div>
+        <div id="copy-status" class="copy-status">修改左侧内容后，右侧会自动更新。</div>
+        <div class="email-stage">
+          <div id="email-preview"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/marketing-email-builder.js" defer></script>
+  </body>
+</html>

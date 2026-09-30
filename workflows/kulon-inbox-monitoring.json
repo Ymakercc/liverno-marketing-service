@@ -1,0 +1,81 @@
+{
+  "id": "a3b50ed7-42a1-47ce-b403-bb3ff3d5911d",
+  "name": "KULON 03 - 阿里邮箱询盘监控",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "0331678e-10bb-4f8b-ae53-28820730c7d1",
+      "name": "手动检查收件箱",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-560, 160]
+    },
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] } },
+      "id": "21be9d3a-aeb4-4d8c-b5df-786270043f66",
+      "name": "每5分钟",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($vars.KULON_API_BASE_URL || \"http://host.docker.internal:8787\") + \"/api/health\" }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "f381aafe-1fc8-47de-bdf7-51fbed595cf9",
+      "name": "检查收件监控开关",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-320, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [{
+            "id": "53d3bcaa-3f03-452b-bdf1-b6a2d488e499",
+            "leftValue": "={{ Boolean($json.capabilities.mailbox && $json.capabilities.automation) }}",
+            "rightValue": true,
+            "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a864935c-78b5-447c-9842-09e184a88945",
+      "name": "邮箱监控已就绪？",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-80, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($vars.KULON_API_BASE_URL || \"http://host.docker.internal:8787\") + \"/api/automation/inbox/poll\" }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ \"Bearer \" + $vars.AUTOMATION_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {} }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "438a6ad5-ccad-47a4-9348-ebdf1a70375a",
+      "name": "读取并同步询盘",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [180, 0]
+    }
+  ],
+  "connections": {
+    "手动检查收件箱": { "main": [[{ "node": "检查收件监控开关", "type": "main", "index": 0 }]] },
+    "每5分钟": { "main": [[{ "node": "检查收件监控开关", "type": "main", "index": 0 }]] },
+    "检查收件监控开关": { "main": [[{ "node": "邮箱监控已就绪？", "type": "main", "index": 0 }]] },
+    "邮箱监控已就绪？": { "main": [[{ "node": "读取并同步询盘", "type": "main", "index": 0 }], []] }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "Asia/Shanghai", "saveManualExecutions": true },
+  "active": false,
+  "versionId": "cf0a4140-4cb9-4a87-910e-fd3dc264ee02",
+  "meta": { "templateCredsSetupCompleted": true },
+  "tags": []
+}

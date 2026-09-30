@@ -1,0 +1,89 @@
+{
+  "id": "d8f3b7a2-6c14-4e09-9a52-2c7d1e5b4f02",
+  "name": "KULON 02 - 按时区发送已排期邮件",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c43326a8-e463-45c3-a1af-64317d54d324",
+      "name": "手动检查到期邮件",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-560, 160]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] }
+      },
+      "id": "93d8be72-b10c-45d9-b0f0-97539dbfabf0",
+      "name": "每15分钟",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($vars.KULON_API_BASE_URL || \"http://host.docker.internal:8787\") + \"/api/health\" }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "efca04c7-9ece-48b2-a8c1-f3d0bc780abe",
+      "name": "检查发送开关",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-320, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "f6bfedc8-0680-4948-ae68-c6f39a7fe45b",
+              "leftValue": "={{ Boolean($json.capabilities.sending && $json.capabilities.feishu && $json.capabilities.automation) }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "747a5436-90b5-46d8-91a0-c9e38567008a",
+      "name": "允许发送？",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-80, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($vars.KULON_API_BASE_URL || \"http://host.docker.internal:8787\") + \"/api/automation/send-due\" }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ \"Bearer \" + $vars.AUTOMATION_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { limit: 300 } }}",
+        "options": { "timeout": 900000 }
+      },
+      "id": "6fe15f7b-4905-453a-baca-72b94dd2d51a",
+      "name": "发送到期邮件",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [180, 0]
+    }
+  ],
+  "connections": {
+    "手动检查到期邮件": { "main": [[{ "node": "检查发送开关", "type": "main", "index": 0 }]] },
+    "每15分钟": { "main": [[{ "node": "检查发送开关", "type": "main", "index": 0 }]] },
+    "检查发送开关": { "main": [[{ "node": "允许发送？", "type": "main", "index": 0 }]] },
+    "允许发送？": { "main": [[{ "node": "发送到期邮件", "type": "main", "index": 0 }], []] }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "Asia/Shanghai", "saveManualExecutions": true },
+  "active": false,
+  "versionId": "60113e61-936c-4d42-883c-c22df9b36503",
+  "meta": { "templateCredsSetupCompleted": true },
+  "tags": []
+}

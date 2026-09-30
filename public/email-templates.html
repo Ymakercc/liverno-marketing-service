@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KULON 邮件模板预览</title>
+    <link rel="stylesheet" href="/email-templates.css">
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">KULON EMAIL CONCEPTS</p>
+        <h1>外贸开发信模板预览</h1>
+        <p class="header-note">基础模板用于快速编辑；产品卡片使用已接入的具体型号实物图，第二轮样稿单独提供完整预览。</p>
+      </div>
+      <div class="header-actions"><a href="/second-touch-preview.html" class="preview-link">查看第二轮样稿</a><a href="/email-artwork-preview.html" class="preview-link">查看 10 款版式</a><a href="/" class="back-link">返回营销工作台</a></div>
+    </header>
+
+    <main>
+      <section class="concept" aria-labelledby="concept-one">
+        <div class="concept-heading">
+          <div>
+            <span class="concept-number">01</span>
+            <h2 id="concept-one">01 · 经销商价格参考版</h2>
+          </div>
+          <span class="usage">首次触达 · 价格切入</span>
+        </div>
+        <div class="mail-shell">
+          <div class="mail-subject">Subject: Selected MEAN WELL power supply prices for your review</div>
+          <div class="email email-one">
+            <table class="email-table" role="presentation">
+              <tr>
+                <td class="quote-brand">
+                  <table class="brand-layout" role="presentation">
+                    <tr>
+                      <td><img src="/assets/meanwell-kulon-logo.png" width="190" alt="MEAN WELL KULON"></td>
+                      <td class="brand-caption">MEAN WELL POWER SUPPLY SOLUTIONS</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td class="price-cover">
+                  <table class="cover-layout" role="presentation">
+                    <tr>
+                      <td class="cover-copy">
+                        <p class="cover-kicker">DISTRIBUTOR PRICE BRIEF</p>
+                        <h3>Selected MEAN WELL<br><span>models for your market</span></h3>
+                        <p class="cover-description">A practical price reference for industrial power supply sourcing and quotation planning.</p>
+                      </td>
+                      <td class="cover-meta">
+                        <span>REFERENCE CURRENCY</span>
+                        <strong>USD / EUR</strong>
+                        <span>COMMERCIAL BASIS</span>
+                        <strong>Per unit</strong>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td class="quote-facts">
+                  <table class="facts-layout" role="presentation">
+                    <tr>
+                      <td><strong>6-8 models</strong><span>Selected for your market</span></td>
+                      <td><strong>In Stock</strong><span>Availability</span></td>
+                      <td><strong>On request</strong><span>Final quotation</span></td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td class="content-cell">
+                  <p class="greeting">Dear {{contactName}},</p>
+                  <p>We noticed that {{companyName}} works with industrial power and automation products in {{country}}.</p>
+                  <p>We supply MEAN WELL power supplies and can support distributors with product selection, stable lead times and technical assistance.</p>
+                  <div class="price-intro">
+                    <strong>Selected price reference</strong>
+                    <span>Indicative commercial reference</span>
+                  </div>
+                  <table class="product-grid" role="presentation" aria-label="Selected MEAN WELL model cards">
+                    <tr>
+                      <td><div class="product-image-pending">待上传<br>LRS-350-24 实物图</div><strong>LRS-350-24</strong><span>Reference price · In Stock</span></td>
+                      <td><div class="product-image-pending">待上传<br>HDR-60-24 实物图</div><strong>HDR-60-24</strong><span>Reference price · In Stock</span></td>
+                    </tr>
+                    <tr>
+                      <td><div class="product-image-pending">待上传<br>ELG-150-24 实物图</div><strong>ELG-150-24</strong><span>Reference price · In Stock</span></td>
+                      <td><div class="product-image-pending">待上传<br>IRM-60-24 实物图</div><strong>IRM-60-24</strong><span>Reference price · In Stock</span></td>
+                    </tr>
+                    <tr>
+                      <td><div class="product-image-pending">待上传<br>GST60A12 实物图</div><strong>GST60A12</strong><span>Reference price · In Stock</span></td>
+                      <td><div class="product-image-pending">待上传<br>DUPS-240-24 实物图</div><strong>DUPS-240-24</strong><span>Reference price · In Stock</span></td>
+                    </tr>
+                  </table>
+                  <p class="fine-print">Prices are for reference only and should be reconfirmed before quotation. Other brands and models are also available.</p>
+                  <p>Would you like us to prepare a model list for your current customer applications?</p>
+                  <p class="cta-line"><a class="reply-cta" href="mailto:Marketing@kulon.com">Reply with your target models</a></p>
+                  <p class="signoff">Best regards,<br><strong>MEAN WELL KULON TEAM</strong><br><a href="mailto:Sales@kulon.com">Sales@kulon.com</a> &nbsp; | &nbsp; <a href="https://meanwell-led.com/">meanwell-led.com</a></p>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="concept" aria-labelledby="concept-two">
+        <div class="concept-heading">
+          <div>
+            <span class="concept-number">02</span>
+            <h2 id="concept-two">品牌产品卡片</h2>
+          </div>
+          <span class="usage">第二次触达 · 产品推荐</span>
+        </div>
+        <div class="mail-shell">
+          <div class="mail-subject">Subject: A focused power supply list for {{companyName}}</div>
+          <div class="email email-two">
+            <table class="email-table" role="presentation">
+              <tr>
+                <td class="hero-band">
+                  <img src="/assets/meanwell-kulon-logo.png" width="205" alt="MEAN WELL KULON">
+                  <p class="hero-kicker">MEAN WELL DISTRIBUTION SUPPORT</p>
+                  <h3>Power solutions<br><span>ready for your next quote</span></h3>
+                  <p class="hero-copy">A practical selection of industrial power supply categories for distributors, system integrators and project buyers.</p>
+                </td>
+              </tr>
+              <tr>
+                <td class="content-cell card-content">
+                  <p class="greeting">Dear {{contactName}},</p>
+                  <p>Following up with a short selection that may fit {{companyName}}'s current sourcing needs.</p>
+                  <table class="feature-grid" role="presentation">
+                    <tr>
+                      <td><strong>Enclosed</strong><span>RSP / HRP series<br>Industrial equipment</span></td>
+                      <td><strong>DIN-rail</strong><span>HDR / NDR series<br>Automation panels</span></td>
+                      <td><strong>Open-frame</strong><span>Low-profile options<br>Compact equipment</span></td>
+                    </tr>
+                  </table>
+                  <div class="offer-strip">
+                    <span class="offer-label">CURRENT REFERENCE</span>
+                    <strong>Selected model&nbsp;&nbsp; Price pending</strong>
+                    <span>In Stock</span>
+                  </div>
+                  <p>We can also help compare specifications, recommend alternatives and prepare a quotation based on your target quantity and destination.</p>
+                  <p class="button-wrap"><a class="button-cta" href="mailto:Marketing@kulon.com">Send us your requirement</a></p>
+                  <p class="signoff">Best regards,<br><strong>MEAN WELL KULON TEAM</strong><br><a href="mailto:Sales@kulon.com">Sales@kulon.com</a> &nbsp; | &nbsp; <a href="https://meanwell-led.com/">meanwell-led.com</a></p>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="concept" aria-labelledby="concept-three">
+        <div class="concept-heading">
+          <div>
+            <span class="concept-number">03</span>
+            <h2 id="concept-three">采购需求 / 报价单式</h2>
+          </div>
+          <span class="usage">明确需求 · 询价跟进</span>
+        </div>
+        <div class="mail-shell">
+          <div class="mail-subject">Subject: Power supply options and pricing for {{companyName}}</div>
+          <div class="email email-three">
+            <table class="email-table" role="presentation">
+              <tr>
+                <td class="inquiry-header">
+                  <img src="/assets/meanwell-kulon-logo.png" width="180" alt="MEAN WELL KULON">
+                  <div><strong>POWER SUPPLY SOURCING NOTE</strong><span>Prepared for {{companyName}}</span></div>
+                </td>
+              </tr>
+              <tr>
+                <td class="content-cell inquiry-content">
+                  <h3>Let's match the right power supply to your application</h3>
+                  <p class="muted-intro">A concise starting point for your next industrial power supply enquiry.</p>
+                  <table class="inquiry-table" role="presentation">
+                    <tr><td>Suggested categories</td><td>Enclosed / DIN-rail / Open-frame</td></tr>
+                    <tr><td>Reference models</td><td>RSP-100-24, HRP-150-24, NSP-1600-12</td></tr>
+                    <tr><td>Availability</td><td>In Stock</td></tr>
+                    <tr><td>Support available</td><td>Model comparison, technical selection and quotation</td></tr>
+                  </table>
+                  <div class="reply-box">
+                    <strong>To prepare an accurate quote, please reply with:</strong>
+                    <ul><li>Required model or specification</li><li>Estimated quantity</li><li>Destination country</li></ul>
+                  </div>
+                  <p class="button-wrap"><a class="button-cta green-button" href="mailto:Marketing@kulon.com">Request a quotation</a></p>
+                  <p class="signoff">Best regards,<br><strong>MEAN WELL KULON TEAM</strong><br><a href="mailto:Sales@kulon.com">Sales@kulon.com</a> &nbsp; | &nbsp; <a href="https://meanwell-led.com/">meanwell-led.com</a></p>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

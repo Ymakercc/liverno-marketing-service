@@ -1,0 +1,220 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  color: #1c2e36;
+  background: #eef2f3;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px max(22px, calc((100vw - 1440px) / 2));
+  color: #fff;
+  background: #07344b;
+  border-bottom: 4px solid #2fbf68;
+}
+.page-header h1, .page-header p { margin: 0; }
+.page-header h1 { font-size: 27px; line-height: 1.2; }
+.page-header p:last-child { margin-top: 7px; color: #cfe1e6; font-size: 13px; line-height: 1.5; }
+.page-header a {
+  flex: 0 0 auto;
+  padding: 10px 13px;
+  color: #07344b;
+  background: #88e69b;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.eyebrow { margin: 0 0 6px; color: #8beaa4; font-size: 11px; line-height: 15px; font-weight: 850; text-transform: uppercase; }
+
+.builder-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 520px) minmax(0, 1fr);
+  gap: 22px;
+  width: min(1440px, calc(100% - 36px));
+  margin: 22px auto 42px;
+}
+.editor-panel, .preview-panel {
+  background: #fff;
+  border: 1px solid #d6e2e5;
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgb(17 47 58 / 9%);
+}
+.editor-panel { padding: 22px; }
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+.section-title span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: #fff;
+  background: #0f6b4c;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 850;
+}
+.section-title h2 { margin: 0; color: #113846; font-size: 18px; line-height: 1.25; }
+.product-section-title { margin-top: 24px; }
+
+label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  color: #40555d;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 750;
+}
+input, textarea, select {
+  width: 100%;
+  border: 1px solid #cbdadd;
+  border-radius: 5px;
+  background: #fbfdfd;
+  color: #142d36;
+  outline: none;
+}
+input { min-height: 40px; padding: 8px 10px; }
+select { min-height: 40px; padding: 8px 10px; }
+textarea { padding: 10px 11px; resize: vertical; line-height: 1.5; }
+input:focus, textarea:focus, select:focus { border-color: #2fbf68; box-shadow: 0 0 0 3px rgb(47 191 104 / 12%); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.product-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+.product-search button, .copy-actions button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #118f42;
+  border-radius: 5px;
+  color: #fff;
+  background: #118f42;
+  font-size: 13px;
+  font-weight: 850;
+}
+.catalog-meta, .copy-status {
+  min-height: 20px;
+  color: #6a7b82;
+  font-size: 12px;
+  line-height: 18px;
+}
+.product-results {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-height: 460px;
+  overflow: auto;
+  margin-top: 10px;
+  padding-right: 4px;
+}
+.product-card {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d9e5e7;
+  border-radius: 6px;
+  background: #f8fbfb;
+}
+.product-card img {
+  width: 74px;
+  height: 62px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #e4ecee;
+}
+.product-card strong, .product-card span { display: block; }
+.product-card strong { color: #0f3440; font-size: 13px; line-height: 17px; }
+.product-card span { margin-top: 2px; color: #687982; font-size: 11px; line-height: 15px; }
+.product-card button {
+  margin-top: 7px;
+  padding: 6px 8px;
+  color: #0f6b4c;
+  background: #fff;
+  border: 1px solid #9fd7b4;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 850;
+}
+.mini-heading { margin: 18px 0 10px; color: #113846; font-size: 15px; }
+.selected-products { display: grid; gap: 9px; }
+.selected-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #eef7f1;
+  border: 1px solid #cbe7d4;
+  border-radius: 6px;
+}
+.selected-item strong { color: #0e3c36; font-size: 13px; }
+.selected-item span { display: block; margin-top: 3px; color: #60747b; font-size: 11px; }
+.selected-item button {
+  align-self: start;
+  padding: 5px 8px;
+  color: #a33c2d;
+  background: #fff;
+  border: 1px solid #edc7c0;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.preview-panel { position: sticky; top: 16px; align-self: start; overflow: hidden; }
+.preview-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  color: #fff;
+  background: #07344b;
+}
+.preview-toolbar h2 { margin: 0 0 5px; font-size: 20px; line-height: 1.25; }
+.preview-toolbar span { display: block; color: #d4e4e8; font-size: 12px; line-height: 18px; }
+.copy-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.copy-actions button:last-child {
+  color: #07344b;
+  background: #e9f4ee;
+  border-color: #b7d8c4;
+}
+.copy-status { padding: 10px 20px; background: #f7fafb; border-bottom: 1px solid #dce7e9; }
+.copy-status.success { color: #118f42; }
+.copy-status.error { color: #b42318; }
+.email-stage {
+  overflow: auto;
+  max-height: calc(100vh - 180px);
+  padding: 20px;
+  background: #eef2f3;
+}
+#email-preview { min-width: 720px; }
+
+@media (max-width: 1080px) {
+  .builder-layout { grid-template-columns: 1fr; }
+  .preview-panel { position: static; }
+  .email-stage { max-height: none; }
+}
+
+@media (max-width: 640px) {
+  .page-header { align-items: flex-start; flex-direction: column; padding: 22px 16px; }
+  .builder-layout { width: calc(100% - 20px); }
+  .editor-panel { padding: 16px; }
+  .form-grid, .product-results { grid-template-columns: 1fr; }
+  .preview-toolbar { flex-direction: column; }
+}

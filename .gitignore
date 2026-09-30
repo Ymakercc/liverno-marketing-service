@@ -1,0 +1,53 @@
+.DS_Store
+._*
+node_modules/
+.env
+.env.*
+!.env.example
+
+# Local tunnels, backups, and tool state
+.cloudflared/
+.tmp_backups/
+.tools/
+.local_docs/
+.data/
+.preview-data/
+
+# Runtime databases, logs, reports, and local archives
+*.sqlite
+*.sqlite3
+*.db
+logs/
+*.log
+coverage/
+*.zip
+
+# Raw n8n exports and execution data may contain customer data or tokens.
+n8n.json
+workflow-live*.json
+wf_*.json
+live_*.json
+base_for_*.json
+current_live_for_sync.json
+openapi.json
+exec_*.json
+latest_execs.json
+exec_list_80.json
+
+# Historical one-off patch/merge scripts can contain live workflow values.
+patch_*.mjs
+merge_*.mjs
+build_*.mjs
+make_final_patch.mjs
+fix_read_filter_value.mjs
+set_gemini_prompt.mjs
+sync_gemini_prompt_only.mjs
+
+# Local screenshots / binary captures
+image.png
+
+# Hostinger upload bundle is kept locally for deployment, not committed.
+hostinger-email-assets/
+
+# Duplicate source archives copied into test/ are not test fixtures.
+test/*.zip

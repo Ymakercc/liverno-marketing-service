@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>实际邮件预览 - KULON</title>
+  <link rel="stylesheet" href="/sent-email-preview.css">
+</head>
+<body>
+  <header class="preview-header">
+    <div>
+      <a href="/#queue">返回发送队列</a>
+      <p>KULON 营销邮件</p>
+      <h1 id="preview-subject">正在读取邮件...</h1>
+    </div>
+    <span id="preview-status" class="status-pill">读取中</span>
+  </header>
+  <main>
+    <section class="mail-meta" aria-label="邮件信息">
+      <div><span>公司</span><strong id="preview-company">-</strong></div>
+      <div><span>收件人</span><strong id="preview-recipient">-</strong></div>
+      <div><span>发送时间</span><strong id="preview-time">-</strong></div>
+      <div><span>Brevo Message ID</span><strong id="preview-message-id">-</strong></div>
+    </section>
+    <section class="mail-stage">
+      <iframe id="preview-frame" title="实际发送的邮件内容" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <div id="preview-error" class="preview-error" hidden></div>
+    </section>
+  </main>
+  <script src="/sent-email-preview.js"></script>
+</body>
+</html>

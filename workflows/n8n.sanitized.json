@@ -1,0 +1,1004 @@
+{
+  "name": "B2B Email Marketing Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-e5f6-4890-abcd-ef1234567890",
+      "name": "Hourly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "0f8e7d6c-5b4a-4321-9f0e-d1c2b3a49586",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "bitable",
+        "operation": "bitable:table:record:search",
+        "app_toke": "{{FEISHU_APP_TOKEN}}",
+        "table_id": "{{FEISHU_TABLE_ID}}",
+        "body": "={\n  \"filter\": {\n    \"conjunction\": \"and\",\n    \"conditions\": [\n      {\n        \"field_name\": \"未读邮件\",\n        \"operator\": \"isNotEmpty\",\n        \"value\": []\n      }\n    ]\n  }\n}"
+      },
+      "id": "b2c3d4e5-f6a7-4890-bcde-f12345678901",
+      "name": "Read Feishu Table",
+      "type": "n8n-nodes-feishu-lite.feishuNode",
+      "typeVersion": 1,
+      "position": [
+        464,
+        304
+      ],
+      "credentials": {
+        "feishuCredentialsApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{FEISHUCREDENTIALSAPI_NAME}}"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const records = $input.first().json.data?.items || [];\nconst out = [];\nconst skipped = [];\nconst now = new Date();\n\nconst pick = (fields, keys) => {\n  for (const k of keys) {\n    if (fields[k] !== undefined) return fields[k];\n  }\n  return undefined;\n};\n\nconst toText = (v) => {\n  if (v == null) return '';\n  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v).trim();\n  if (Array.isArray(v)) {\n    return v\n      .map((x) => {\n        if (x == null) return '';\n        if (typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean') return String(x).trim();\n        if (typeof x === 'object') return (x.text || x.link || x.email || x.name || '').toString().trim();\n        return '';\n      })\n      .filter(Boolean)\n      .join(', ');\n  }\n  if (typeof v === 'object') return String(v.text || v.link || v.email || v.name || '').trim();\n  return '';\n};\n\nconst toEmails = (v) => {\n  const t = toText(v).replace(/mailto:/gi, '');\n  const arr = t.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || [];\n  return [...new Set(arr.map((x) => x.toLowerCase()))];\n};\n\nconst requiredDaysByStatus = { 0: 0, 1: 3, 2: 7, 3: 15 };\n\nfor (const record of records) {\n  const fields = record.fields || {};\n\n  const companyName = toText(pick(fields, ['公司名', 'Company Name', '公司名称', '企业名称']));\n  const website = toText(pick(fields, ['官网', 'Website', '公司网站']));\n  const unreadEmails = toEmails(pick(fields, ['未读邮件', 'Unread Emails', '未读邮箱']));\n  const readEmails = toEmails(pick(fields, ['已读邮件', 'Read Emails', '已读邮箱']));\n  const followUpStatusRaw = toText(pick(fields, ['跟进状态1', 'Follow-up Status', '跟进状态'])) || '0';\n  const lastFollowUp = toText(pick(fields, ['最后跟进时间', 'Last Follow-up Time', '上次跟进时间']));\n  const lastOpenTime = toText(pick(fields, ['最后打开时间', 'Last Open Time', '跟进状态2']));\n  const customerProfile = toText(pick(fields, ['客户画像', 'Customer Profile']));\n  const region = toText(pick(fields, ['所属区域', 'Region']));\n  const country = toText(pick(fields, ['国家', 'Country']));\n\n  const followUpStatus = Number.parseInt(followUpStatusRaw, 10) || 0;\n\n  const reasons = [];\n  if (!companyName) reasons.push('missing company');\n  if (!website) reasons.push('missing website');\n  if (!unreadEmails.length) reasons.push('missing unread emails');\n  if (followUpStatus >= 4) reasons.push('follow-up >= 4');\n\n  if (reasons.length) {\n    skipped.push({\n      recordId: record.record_id,\n      reasons,\n      keys: Object.keys(fields),\n      sample: { companyName, website, unreadEmails, followUpStatusRaw },\n    });\n    continue;\n  }\n\n  const lf = lastFollowUp ? new Date(lastFollowUp) : null;\n  const lo = lastOpenTime ? new Date(lastOpenTime) : null;\n\n  const daysSinceLastFollowUp =\n    lf && !Number.isNaN(lf.getTime()) ? Math.floor((now - lf) / (1000 * 60 * 60 * 24)) : 9999;\n\n  const followUpType =\n    lo &&\n    !Number.isNaN(lo.getTime()) &&\n    (!lf || Number.isNaN(lf.getTime()) || lo > lf)\n      ? 'immediate'\n      : 'scheduled';\n\n  const requiredDays = requiredDaysByStatus[followUpStatus] ?? 9999;\n  if (followUpType === 'scheduled' && daysSinceLastFollowUp < requiredDays) {\n    reasons.push(`not due: ${daysSinceLastFollowUp}d < ${requiredDays}d`);\n  }\n\n  if (reasons.length) {\n    skipped.push({\n      recordId: record.record_id,\n      reasons,\n      keys: Object.keys(fields),\n      sample: { companyName, website, unreadEmails, followUpStatusRaw },\n    });\n    continue;\n  }\n\n  out.push({\n    recordId: record.record_id,\n    companyName,\n    website,\n    unreadEmails,\n    readEmails,\n    followUpStatus,\n    lastFollowUp,\n    lastOpenTime,\n    customerProfile,\n    region,\n    country,\n    followUpType,\n    daysSinceLastFollowUp,\n    requiredDays,\n  });\n}\n\nif (out.length) return out.map((x) => ({ json: x }));\n\nreturn [];"
+      },
+      "id": "c3d4e5f6-a7b8-4890-cdef-123456789012",
+      "name": "Filter & Determine Timing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-4890-def0-234567890123",
+      "name": "Process Companies",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.geminiPrompt }}",
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-4890-f123-456789012345",
+      "name": "Gemini Analysis",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1312,
+        304
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputJson = $input.first().json || {};\n\nconst getLocalHour = (date, timeZone) => {\n  return Number(\n    new Intl.DateTimeFormat('en-US', {\n      timeZone,\n      hour12: false,\n      hour: '2-digit',\n    }).format(date)\n  );\n};\n\nif (inputJson.error || inputJson.executionStatus === 'error' || inputJson.errors) {\n  const cd = $('Process Companies').first().json || {};\n  const now = new Date();\n  return [{\n    json: {\n      ...cd,\n      country: 'Unknown',\n      region: 'North America',\n      timezone: 'America/New_York',\n      localHour: getLocalHour(now, 'America/New_York'),\n      shouldSendNow: true,\n      customerProfile: 'Profile analysis unavailable - using fallback',\n      emailSubject: `Following up with ${cd.companyName}`,\n      emailBody: 'Hi, I would love to explore how we can support your team.',\n      sendTime: now.toISOString(),\n    }\n  }];\n}\n\nconst geminiOutput = inputJson.text || inputJson.output || '{}';\nlet parsedData = {};\n\ntry {\n  const jsonMatch = geminiOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    parsedData = JSON.parse(jsonMatch[0]);\n  } else {\n    const lines = geminiOutput.split('\\n');\n    lines.forEach((line) => {\n      if (line.includes('Country:')) parsedData.country = line.split(':').slice(1).join(':').trim();\n      if (line.includes('Region:')) parsedData.region = line.split(':').slice(1).join(':').trim();\n      if (line.includes('Subject:')) parsedData.emailSubject = line.split(':').slice(1).join(':').trim();\n      if (line.includes('Body:')) parsedData.emailBody = line.split(':').slice(1).join(':').trim();\n    });\n  }\n} catch (error) {\n  console.error('Parse error:', error);\n}\n\nconst companyData = $('Process Companies').first().json;\nconst regionTimezoneMap = {\n  'Asia': 'Asia/Singapore',\n  'East-Aus': 'Australia/Sydney',\n  'ME-Africa': 'Africa/Johannesburg',\n  'Europe': 'Europe/Berlin',\n  'North America': 'America/New_York',\n  'South America': 'America/Sao_Paulo'\n};\n\nconst region = parsedData.region || 'North America';\nconst timezone = regionTimezoneMap[region] || 'America/New_York';\nconst now = new Date();\n\nconst localHour = getLocalHour(now, timezone);\nconst isInSendWindow = localHour >= 9 && localHour < 17;\nconst forceDebugSend = true;\nconst shouldSendNow = forceDebugSend || companyData.followUpType === 'immediate' || isInSendWindow;\n\nreturn [{\n  json: {\n    ...companyData,\n    country: parsedData.country || 'Unknown',\n    region,\n    timezone,\n    localHour,\n    shouldSendNow,\n    customerProfile: parsedData.customerProfile || 'Profile not available',\n    emailSubject: parsedData.emailSubject || `Following up with ${companyData.companyName}`,\n    emailBody: parsedData.emailBody || 'Hi, I would love to explore how we can support your team.',\n    sendTime: shouldSendNow ? now.toISOString() : null,\n  }\n}];"
+      },
+      "id": "a7b8c9d0-e1f2-4890-1234-567890123456",
+      "name": "Parse & Schedule Time",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "bitable",
+        "operation": "bitable:table:record:update",
+        "app_toke": "{{FEISHU_APP_TOKEN}}",
+        "table_id": "{{FEISHU_TABLE_ID}}",
+        "record_id": "={{ $json.recordId || $json.record_id || '' }}",
+        "body": "={{ JSON.stringify({ fields: { \"国家\": $json.country, \"所属区域\": $json.region, \"客户画像\": $json.customerProfile } }) }}"
+      },
+      "id": "b8c9d0e1-f2a3-4890-2345-678901234567",
+      "name": "Update Feishu - Profile",
+      "type": "n8n-nodes-feishu-lite.feishuNode",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        304
+      ],
+      "credentials": {
+        "feishuCredentialsApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{FEISHUCREDENTIALSAPI_NAME}}"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldSendNow }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "condition-1777523637869-t6hodk6uf"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c9d0e1f2-a3b4-4890-3456-789012345678",
+      "name": "Check Send Window",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2000,
+        304
+      ],
+      "webhookId": ""
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expand unread emails into one item per target so emails can send sequentially\nconst company = $('Parse & Schedule Time').first().json;\nconst uniqueEmails = [...new Set((company.unreadEmails || []).map((email) => (email || '').trim()).filter((email) => email))];\n\nreturn uniqueEmails.map((email, index) => ({\n  json: {\n    ...company,\n    targetEmail: email,\n    emailIndex: index,\n    emailBodyHtml: `${(company.emailBody || '').replace(/\\n/g, '<br>')}`\n  }\n}));"
+      },
+      "id": "11223344-5566-4788-99aa-bbccddeeff00",
+      "name": "Expand Email Targets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random() * 31) + 90 }}"
+      },
+      "id": "e1f2a3b4-c5d6-4890-5678-901234567890",
+      "name": "Delay 90-120s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2656,
+        288
+      ],
+      "webhookId": "6c357e9e-e8d0-4ee0-ab3d-7aa9127f7162"
+    },
+    {
+      "parameters": {
+        "resource": "bitable",
+        "operation": "bitable:table:record:update",
+        "app_toke": "{{FEISHU_APP_TOKEN}}",
+        "table_id": "{{FEISHU_TABLE_ID}}",
+        "record_id": "={{ $('Parse & Schedule Time').first().json.recordId }}",
+        "body": "={{ JSON.stringify({ fields: { \"最后跟进时间\": Date.now(), \"跟进状态1\": (Math.min((($json.emailIndex ?? 0) === 0 ? ($('Parse & Schedule Time').first().json.followUpStatus + 1) : $('Parse & Schedule Time').first().json.followUpStatus), 4)).toString() } }) }}"
+      },
+      "id": "a3b4c5d6-e7f8-4890-7890-123456789012",
+      "name": "Update Feishu - Follow-up",
+      "type": "n8n-nodes-feishu-lite.feishuNode",
+      "typeVersion": 1,
+      "position": [
+        2576,
+        32
+      ],
+      "credentials": {
+        "feishuCredentialsApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{FEISHUCREDENTIALSAPI_NAME}}"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "bitable",
+        "operation": "bitable:table:record:get",
+        "app_toke": "{{FEISHU_APP_TOKEN}}",
+        "table_id": "{{FEISHU_TABLE_ID}}",
+        "record_id": "={{ $json.recordId }}"
+      },
+      "id": "d6e7f8a9-b0c1-4890-0123-456789012345",
+      "name": "Get Current Feishu Data",
+      "type": "n8n-nodes-feishu-lite.feishuNode",
+      "typeVersion": 1,
+      "position": [
+        688,
+        608
+      ],
+      "credentials": {
+        "feishuCredentialsApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{FEISHUCREDENTIALSAPI_NAME}}"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update Unread/Read email lists when Brevo reports an open event\nconst payload = $input.first().json || {};\nconst data = payload.data || {};\nconst record = data.record || (Array.isArray(data.records) ? data.records[0] : null) || {};\nconst fields = record.fields || data.fields || {};\n\nconst trackingData = $('Build Delivery Update').first().json;\n\nconst toEmailList = (value) => {\n  if (value == null) return [];\n\n  if (Array.isArray(value)) {\n    const out = [];\n    for (const item of value) {\n      if (item == null) continue;\n      if (typeof item === 'string') out.push(item);\n      else if (typeof item === 'object') out.push(item.text || item.email || item.link || '');\n      else out.push(String(item));\n    }\n    return out\n      .map((x) => String(x).replace(/mailto:/gi, '').trim().toLowerCase())\n      .filter(Boolean);\n  }\n\n  if (typeof value === 'object') {\n    const one = (value.text || value.email || value.link || '').toString();\n    return one\n      .split(',')\n      .map((x) => x.replace(/mailto:/gi, '').trim().toLowerCase())\n      .filter(Boolean);\n  }\n\n  return String(value)\n    .split(',')\n    .map((x) => x.replace(/mailto:/gi, '').trim().toLowerCase())\n    .filter(Boolean);\n};\n\nconst unreadRaw = fields['未读邮件'] ?? fields['Unread Emails'] ?? null;\nconst readRaw = fields['已读邮件'] ?? fields['Read Emails'] ?? '';\n\nlet unreadList = [...new Set(toEmailList(unreadRaw))];\nlet readList = [...new Set(toEmailList(readRaw))];\n\nconst openedEmail = ((trackingData.openedEmail || trackingData.email || '') + '')\n  .replace(/mailto:/gi, '')\n  .trim()\n  .toLowerCase();\nconst openedAt = ((trackingData.openedAt || trackingData.occurredAt || new Date().toISOString()) + '').toString();\n\nif (openedEmail) {\n  unreadList = unreadList.filter((email) => email !== openedEmail);\n  if (!readList.includes(openedEmail)) readList.push(openedEmail);\n}\n\nconst unreadLink = unreadList[0] ? { text: unreadList[0], link: 'mailto:' + unreadList[0], type: 'url' } : null;\nconst readText = readList.join(', ');\n\nreturn [{\n  json: {\n    recordId: trackingData.recordId,\n    unreadLink,\n    readText,\n    openedAt,\n  }\n}];"
+      },
+      "id": "e7f8a9b0-c1d2-4890-1234-567890123456",
+      "name": "Update Email Lists",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "bitable",
+        "operation": "bitable:table:record:update",
+        "app_toke": "{{FEISHU_APP_TOKEN}}",
+        "table_id": "{{FEISHU_TABLE_ID}}",
+        "record_id": "={{ $json.recordId }}",
+        "body": "={{ JSON.stringify({ fields: { \"未读邮件\": $json.unreadLink, \"已读邮件\": $json.readText, \"最后打开时间\": (Date.parse($json.openedAt) || Date.now()) } }) }}"
+      },
+      "id": "f8a9b0c1-d2e3-4890-2345-678901234567",
+      "name": "Update Feishu - Email Open",
+      "type": "n8n-nodes-feishu-lite.feishuNode",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        608
+      ],
+      "credentials": {
+        "feishuCredentialsApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{FEISHUCREDENTIALSAPI_NAME}}"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## B2B Email Marketing Automation\n\n**Required Feishu Fields (User fills):**\n- Company Name\n- Website\n- Unread Emails\n\n**Auto-filled Fields (Workflow fills):**\n- Country\n- Region (Asia, East-Aus, ME-Africa, Europe, North America, South America)\n- Customer Profile\n- Read Emails\n- Last Open Time\n- Follow-up Status (1/2/3/4)\n- Last Follow-up Time\n\n**Features:**\n- Hourly Feishu sync\n- Gemini AI analysis\n- Region-based scheduling (8-9 AM local)\n- Sequential company processing\n- Sequential multi-email sending with 90-120s delay\n- Email open tracking webhook\n- Auto move Unread→Read Emails\n- Immediate follow-up only after a new open event\n- 3/7/15/30 day follow-up intervals\n\n**Tracking pixel base URL:**\nSet `TRACKING_BASE_URL` to your public webhook base URL, for example `https://your-n8n.example.com/webhook`\n\n[Created by n8nbuilder.dev](https://n8nbuilder.dev)",
+        "height": 1068,
+        "width": 520
+      },
+      "id": "b0c1d2e3-f4a5-4890-4567-890123456789",
+      "name": "Workflow Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        480
+      ],
+      "id": "3ad20e44-9c57-413f-9a96-bb5f373de618",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{GOOGLEPALMAPI_NAME}}"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "scrape",
+        "url": "={{ $json.website || $('Process Companies').first().json.website }}",
+        "requestOptions": {}
+      },
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawl",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        304
+      ],
+      "id": "5842c6a4-1e03-4e2b-9886-4f015861f521",
+      "name": "/scrape",
+      "credentials": {
+        "firecrawlApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{FIRECRAWLAPI_NAME}}"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": "={{ 15 }}"
+      },
+      "id": "2f7c1f1e-6e5b-4d1b-9f6a-4fb0d2f3d9a1",
+      "name": "Gemini Throttle 15s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        304
+      ],
+      "webhookId": "7bbe7963-ff26-4dde-9215-6739c28a4b05"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "brevo-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6d2e4f7a-2f7d-4ab1-9a68-9a0b3f58d0d4",
+      "name": "Brevo Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        784
+      ],
+      "webhookId": "af64cfba-6de5-4c27-955f-a8675a48ca0b",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json || {};\nconst body = payload.body ?? payload;\nconst events = Array.isArray(body) ? body : [body];\n\nconst toIso = (v) => {\n  if (v == null || v === '') return new Date().toISOString();\n  if (typeof v === 'number') {\n    const ms = v > 1e12 ? v : v * 1000;\n    return new Date(ms).toISOString();\n  }\n  const d = new Date(v);\n  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();\n};\n\nconst normalizeEvent = (v) => {\n  const raw = (v || '').toString().trim();\n  const lower = raw.toLowerCase().replace(/\\s+/g, '_');\n  const compact = lower.replace(/_/g, '');\n  if (compact === 'hardbounce' || compact === 'hardbounced') return 'hard_bounced';\n  if (compact === 'softbounce' || compact === 'softbounced') return 'soft_bounced';\n  if (compact === 'uniqueopened') return 'opened';\n  if (compact === 'opened' || compact === 'open') return 'opened';\n  if (compact === 'clicked' || compact === 'click') return 'clicked';\n  return lower;\n};\n\nreturn events.map((e) => {\n  const event = normalizeEvent(e.event || e.Event || e.type);\n  const email = (e.email || e.to || e.recipient || '').toString();\n  const messageId = (e['message-id'] || e.messageId || e.message_id || '').toString();\n  const occurredAt = toIso(e.date || e.ts || e.timestamp || e.occurredAt);\n  const reason = (e.reason || e['reason'] || e['error'] || e['description'] || '').toString();\n  const url = (e.link || e.url || e.clickedUrl || e.clicked_url || e['click_url'] || '').toString();\n\n  return {\n    json: {\n      event,\n      email,\n      messageId,\n      occurredAt,\n      reason,\n      url\n    }\n  };\n});"
+      },
+      "id": "5f8bcbf4-81ce-4f61-aea2-40a4f7aa6c24",
+      "name": "Parse Brevo Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "bitable",
+        "operation": "bitable:table:record:search",
+        "app_toke": "{{FEISHU_APP_TOKEN}}",
+        "table_id": "{{FEISHU_TABLE_ID}}",
+        "body": "={{ JSON.stringify({ filter: { conjunction: 'or', conditions: [ { field_name: '未读邮件', operator: 'contains', value: [$json.email] }, { field_name: '已读邮件', operator: 'contains', value: [$json.email] } ] } }) }}"
+      },
+      "id": "f2c2b5a2-4d8a-4f74-b2bd-1a3b8e2f5a6c",
+      "name": "Search Feishu By Email",
+      "type": "n8n-nodes-feishu-lite.feishuNode",
+      "typeVersion": 1,
+      "position": [
+        688,
+        800
+      ],
+      "credentials": {
+        "feishuCredentialsApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{FEISHUCREDENTIALSAPI_NAME}}"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const evt = $('Parse Brevo Event').first().json || $input.first().json || {};\nconst search = $('Search Feishu By Email').first().json || {};\nconst items = search.data?.items || [];\nconst recordId = items[0]?.record_id || '';\n\nconst event = (evt.event || '').toString();\nconst occurredAt = (evt.occurredAt || '').toString();\n\nreturn [{\n  json: {\n    recordId,\n    email: (evt.email || '').toString(),\n    event,\n    occurredAt,\n    reason: (evt.reason || '').toString(),\n    url: (evt.url || '').toString(),\n    openedEmail: event === 'opened' ? ((evt.email || '') + '').trim() : '',\n    openedAt: event === 'opened' ? occurredAt : ''\n  }\n}];"
+      },
+      "id": "ad6b7c0c-4c9e-4d1e-a3d0-0b5c9cf64d6e",
+      "name": "Build Delivery Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "bitable",
+        "operation": "bitable:table:record:update",
+        "app_toke": "{{FEISHU_APP_TOKEN}}",
+        "table_id": "{{FEISHU_TABLE_ID}}",
+        "record_id": "={{ $json.recordId }}",
+        "body": "={{ (() => { const evt = ($json.event || '').toString(); const fields = {}; if (evt) fields['送达状态'] = evt; if (evt === 'delivered') fields['送达时间'] = Date.parse($json.occurredAt) || Date.now(); if (evt === 'hard_bounced' || evt === 'soft_bounced' || evt.includes('bounce') || evt === 'blocked') fields['退信原因'] = ($json.reason || ''); if (evt === 'clicked') { fields['最后点击时间'] = Date.parse($json.occurredAt) || Date.now(); if ($json.url) fields['最后点击链接'] = $json.url; } if (evt === 'opened') { fields['最后打开时间'] = Date.parse($json.occurredAt) || Date.now(); } return JSON.stringify({ fields }); })() }}"
+      },
+      "id": "9b5c3d1a-7e5a-4b6a-9d5f-2d9a4c7c0f1b",
+      "name": "Update Feishu - Delivery",
+      "type": "n8n-nodes-feishu-lite.feishuNode",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        832
+      ],
+      "credentials": {
+        "feishuCredentialsApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{FEISHUCREDENTIALSAPI_NAME}}"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.responseBody || { \"status\": \"ok\" } }}",
+        "options": {
+          "responseCode": "={{ $json.responseCode || 200 }}"
+        }
+      },
+      "id": "c2b3a4d5-e6f7-4890-1234-567890abc999",
+      "name": "Brevo Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let expectedToken = '';\n\ntry {\n  expectedToken = (($vars && $vars.BREVO_WEBHOOK_TOKEN) || '').toString().trim();\n} catch (e) {}\n\nif (!expectedToken) {\n  try {\n    expectedToken = (($env && $env.BREVO_WEBHOOK_TOKEN) || '').toString().trim();\n  } catch (e) {}\n}\n\n// Fallback to the currently configured webhook token for this instance.\nif (!expectedToken) {\n  expectedToken = '{{BREVO_WEBHOOK_TOKEN}}';\n}\n\nconst headersRaw = $json.headers || {};\nconst headers = {};\nfor (const [k, v] of Object.entries(headersRaw)) {\n  const key = (k || '').toString().toLowerCase();\n  if (!key) continue;\n  const value = Array.isArray(v) ? v.join(',') : (v ?? '').toString();\n  headers[key] = value;\n}\n\nconst query = $json.query || {};\nconst auth = (headers['authorization'] || '').trim();\nconst bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';\n\nconst candidate = (\n  headers['x-webhook-token'] ||\n  headers['x-mailin-token'] ||\n  headers['x-brevo-token'] ||\n  headers['x-token'] ||\n  (query.token ?? query.Token ?? query.TOKEN) ||\n  bearer ||\n  ''\n).toString().trim();\n\nconst hasCandidate = Boolean(candidate);\nconst authorized = hasCandidate && candidate === expectedToken;\n\nif (!authorized) {\n  return [{\n    json: {\n      ...$json,\n      authorized: false,\n      responseCode: 401,\n      responseBody: { status: 'unauthorized' },\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...$json,\n    authorized: true,\n    tokenPresent: hasCandidate,\n  }\n}];"
+      },
+      "id": "2e5b10e3-3d9f-4f33-8c43-4ddc3d0b6c17",
+      "name": "Verify Brevo Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.authorized }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "condition-1778577030378-be209puax"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7aa5c2c8-ae1e-4db1-9b78-5c2c1a2c6dc9",
+      "name": "Brevo Auth OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        640,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "condition-1778578931436-mvomeby56"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c3f830d2-058c-4b07-b6b9-3ff48e840e3e",
+      "name": "Brevo Event Is Opened",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1152,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "sendHTML": true,
+        "subject": "={{ $json.emailSubject }}",
+        "htmlContent": "={{ $json.emailBodyHtml || \"\" }}",
+        "sender": "={{ $vars.FROM_EMAIL || \"{{FROM_EMAIL}}\" }}",
+        "receipients": "={{ $json.targetEmail }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "id": "bb1e8f9f-1a0a-4e9c-a6c9-89c13c0d2fd7",
+      "name": "Brevo Send Email",
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        288
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "{{N8N_CREDENTIAL_ID}}",
+          "name": "{{SENDINBLUEAPI_NAME}}"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{\n(() => {\n  const raw = ($json.customerProfile || '').toString().trim();\n  if (!raw) return false;\n  const s = raw.toLowerCase();\n  const placeholders = [\n    'profile analysis unavailable - using fallback',\n    'profile not available',\n    'analysis unavailable',\n    'n/a',\n    'na',\n    'none',\n    'unknown'\n  ];\n  return !placeholders.some((p) => s === p || s.includes(p));\n})()\n}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "condition-1778745237224-rs382ot36"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0e9c2dcf-287b-41f4-9aac-30026ba35786",
+      "name": "Has Customer Profile?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const company = $input.first().json || {};\n\nconst companyName = (company.companyName || '').toString().trim();\nconst customerProfile = (company.customerProfile || '').toString().trim();\nconst region = (company.region || '').toString().trim() || 'North America';\nconst country = (company.country || '').toString().trim() || 'Unknown';\n\nconst emailSubject = (company.emailSubject || '').toString().trim() || (companyName ? `Following up with ${companyName}` : 'Following up');\nconst emailBody = (company.emailBody || '').toString().trim() || (\n  customerProfile\n    ? `Hi,\\n\\nI reviewed your business profile: ${customerProfile}\\n\\nIf it makes sense, I’d love to explore how we can support your team.\\n\\nBest regards,`\n    : 'Hi,\\n\\nI would love to explore how we can support your team.\\n\\nBest regards,'\n);\n\nreturn [{\n  json: {\n    text: JSON.stringify({\n      country,\n      region,\n      customerProfile,\n      emailSubject,\n      emailBody,\n    })\n  }\n}];"
+      },
+      "id": "a5661ef5-be60-44c9-85e3-365c6d7db741",
+      "name": "Build Draft From Profile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const c = $('Process Companies').first().json || {};\nconst companyName = (c.companyName || 'the company').toString().trim();\nconst website = (c.website || $json.website || '').toString().trim();\n\nconst rawScraped = (($json.data && $json.data.markdown) || $json.markdown || ($json.data && $json.data.content) || '').toString();\nconst scraped = rawScraped.replace(/[{}]/g, ' ').slice(0, 12000);\n\nlet salesName = '';\nlet salesWhatsapp = '';\nlet yourWebsite = '';\n\ntry {\n  salesName = (($vars && ($vars.SALES_NAME || $vars.sales_name)) || '').toString().trim();\n  salesWhatsapp = (($vars && ($vars.SALES_WHATSAPP || $vars.sales_whatsapp)) || '').toString().trim();\n  yourWebsite = (($vars && ($vars.YOUR_WEBSITE || $vars.your_website)) || '').toString().trim();\n} catch (e) {}\n\nif (!salesName) salesName = '[sales_name]';\nif (!salesWhatsapp) salesWhatsapp = '[sales_whatsapp]';\nif (!yourWebsite) yourWebsite = '[your_website]';\n\nconst prompt = [\n  'You are an outbound B2B email copywriter for MEAN WELL products.',\n  'Return STRICT JSON only with keys: country, region, customerProfile, emailSubject, emailBody.',\n  '',\n  'Business background:',\n  '- We supply all MEAN WELL product lines.',\n  '- We are a MEAN WELL distributor with 20 years of experience.',\n  '- We serve 3000+ partners worldwide.',\n  '- If customer needs other power supply brands, we can also support them.',\n  '',\n  'Mandatory email structure:',\n  '1) Subject: create dynamically from customer/company research (must be relevant to their business).',\n  `2) Salutation must be exactly: \"Dear ${companyName} Team,\"`,\n  '3) Body order:',\n  '   a) Greeting: hope they are doing well.',\n  '   b) Brief intro: 20 years + 3000+ global partners.',\n  '   c) Infer customer industry from website and state that we can provide customized product recommendations based on their needs.',\n  '   d) Recommend 1-2 models/categories with reason linked to their likely needs.',\n  '   e) Advantages section: choose by customer type using rules below.',\n  '   f) Closing: look forward to cooperation and business growth.',\n  '   g) End with exactly:',\n  '      Best regards,',\n  `      ${salesName}`,\n  `      WhatsApp: ${salesWhatsapp}`,\n  `      Website: ${yourWebsite}`,\n  '',\n  'Advantages library:',\n  '1. 5%-15% lower pricing than market level.',\n  '2. Safe logistics and on-time delivery.',\n  '3. Duty-free channels in selected countries.',\n  '4. Complete MEAN WELL technical support.',\n  '5. Smooth import/export customs delivery.',\n  '6. Customized power supply details on request.',\n  '7. Global MEAN WELL after-sales support with authenticity traceability.',\n  '',\n  'Customer-type advantage selection rules (must follow):',\n  '- Factory customer: emphasize cost + technical support + customization (prefer 1,4,6).',\n  '- Engineering contractor/system integrator: emphasize technical support + after-sales (prefer 4,7, optional 6).',\n  '- Trader/distributor: emphasize cost + lead time + customs + duty-free (prefer 1,2,5,3).',\n  '',\n  'Output rules:',\n  '- region must be one of: Asia, East-Aus, ME-Africa, Europe, North America, South America.',\n  '- 120-190 words for emailBody.',\n  '- Professional and concise tone.',\n  '- No markdown bullets in emailBody.',\n  '- Do not output any extra keys, markdown, or commentary.',\n  '',\n  `Customer target: Company=${companyName}; Website=${website}`,\n  '',\n  'Website content:',\n  scraped\n].join('\\n');\n\nreturn [{\n  json: {\n    ...$json,\n    geminiPrompt: prompt\n  }\n}];"
+      },
+      "id": "9a8b7c6d-5e4f-4321-9abc-def012345678",
+      "name": "Build Gemini Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Hourly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Read Feishu Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Feishu Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Feishu Table": {
+      "main": [
+        [
+          {
+            "node": "Filter & Determine Timing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Determine Timing": {
+      "main": [
+        [
+          {
+            "node": "Process Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Companies": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Has Customer Profile?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Customer Profile?": {
+      "main": [
+        [
+          {
+            "node": "Build Draft From Profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "/scrape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Draft From Profile": {
+      "main": [
+        [
+          {
+            "node": "Parse & Schedule Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Analysis": {
+      "main": [
+        [
+          {
+            "node": "Parse & Schedule Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Schedule Time": {
+      "main": [
+        [
+          {
+            "node": "Check Send Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Feishu - Profile": {
+      "main": [
+        [
+          {
+            "node": "Expand Email Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Email Targets": {
+      "main": [
+        [
+          {
+            "node": "Delay 90-120s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delay 90-120s": {
+      "main": [
+        [
+          {
+            "node": "Brevo Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brevo Send Email": {
+      "main": [
+        [
+          {
+            "node": "Update Feishu - Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Feishu - Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Process Companies",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Current Feishu Data": {
+      "main": [
+        [
+          {
+            "node": "Update Email Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Email Lists": {
+      "main": [
+        [
+          {
+            "node": "Update Feishu - Email Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Feishu - Email Open": {
+      "main": [
+        [
+          {
+            "node": "Update Feishu - Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brevo Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Brevo Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Brevo Token": {
+      "main": [
+        [
+          {
+            "node": "Brevo Auth OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brevo Auth OK?": {
+      "main": [
+        [
+          {
+            "node": "Parse Brevo Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brevo Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Brevo Event": {
+      "main": [
+        [
+          {
+            "node": "Search Feishu By Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Feishu By Email": {
+      "main": [
+        [
+          {
+            "node": "Build Delivery Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Delivery Update": {
+      "main": [
+        [
+          {
+            "node": "Brevo Event Is Opened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brevo Event Is Opened": {
+      "main": [
+        [
+          {
+            "node": "Get Current Feishu Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Feishu - Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Feishu - Delivery": {
+      "main": [
+        [
+          {
+            "node": "Brevo Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Gemini Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "/scrape": {
+      "main": [
+        [
+          {
+            "node": "Gemini Throttle 15s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Throttle 15s": {
+      "main": [
+        [
+          {
+            "node": "Build Gemini Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Send Window": {
+      "main": [
+        [
+          {
+            "node": "Update Feishu - Profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Companies",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Build Gemini Prompt": {
+      "main": [
+        [
+          {
+            "node": "Gemini Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  }
+}

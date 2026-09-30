@@ -1,0 +1,100 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #17272f;
+  background: #edf1ef;
+}
+
+* { box-sizing: border-box; }
+body { min-width: 320px; margin: 0; }
+a { color: inherit; }
+
+.preview-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 25px max(24px, calc((100vw - 920px) / 2));
+  color: #fff;
+  background: #103f32;
+  border-bottom: 4px solid #d6ad45;
+}
+.preview-header h1 { margin: 2px 0 5px; font-size: 24px; line-height: 1.2; }
+.preview-header p { margin: 0; color: #cce0d8; font-size: 12px; }
+.preview-header .eyebrow { color: #f0ce77; font-size: 10px; font-weight: 800; }
+.preview-header > a { padding-bottom: 3px; color: #fff; border-bottom: 1px solid #f0ce77; font-size: 12px; text-decoration: none; white-space: nowrap; }
+
+main { width: min(920px, calc(100% - 32px)); margin: 26px auto 56px; }
+.review-meta {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: #d6dedb;
+  border: 1px solid #d6dedb;
+  border-radius: 6px;
+  gap: 1px;
+}
+.review-meta div { min-width: 0; padding: 11px 14px; background: #fff; }
+.review-meta span, .review-meta strong { display: block; }
+.review-meta span { color: #718078; font-size: 9px; }
+.review-meta strong { margin-top: 4px; overflow-wrap: anywhere; font-size: 11px; }
+
+.mail-window { overflow: hidden; background: #fff; border: 1px solid #d2dcda; border-radius: 7px; box-shadow: 0 18px 42px rgb(32 57 49 / 12%); }
+.mail-toolbar { display: grid; grid-template-columns: 74px minmax(0, 1fr); align-items: center; min-height: 47px; padding: 9px 16px; background: #f8faf9; border-bottom: 1px solid #dce4e2; }
+.mail-toolbar span { color: #7a8781; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.mail-toolbar strong { color: #233a45; font-size: 12px; }
+.email { padding: 24px 10px 34px; background: #edf1ef; font-family: Arial, Helvetica, sans-serif; }
+.email-table { width: 640px; max-width: 100%; margin: 0 auto; border-collapse: collapse; background: #fff; }
+
+.brand-row { padding: 16px 34px; border-bottom: 1px solid #dce6e2; }
+.brand-row img { display: block; width: 190px; max-width: 100%; height: auto; }
+
+.email-intro { padding: 28px 38px 29px; color: #fff; background: #103f32; border-bottom: 4px solid #d6ad45; }
+.email-intro .kicker { margin: 0 0 9px; color: #f1d485; font-size: 9px; line-height: 14px; font-weight: 800; }
+.email-intro h2 { margin: 0; font-size: 29px; line-height: 34px; letter-spacing: 0; }
+.email-intro h2 span { color: #9fd1ae; }
+.email-intro .intro-copy { margin: 11px 0 0; color: #d4e4de; font-size: 12px; line-height: 18px; }
+
+.email-body { padding: 29px 38px 34px; color: #2e3c40; font-size: 14px; line-height: 22px; }
+.email-body p { margin: 0 0 15px; }
+.email-body .greeting { color: #153e34; font-size: 16px; font-weight: 700; }
+.product-grid { margin: 19px 0 8px; border-collapse: collapse; }
+.product-cell { width: 50%; padding: 6px; vertical-align: top; }
+.product-card { overflow: hidden; border-collapse: separate; background: #f8faf9; border: 1px solid #dbe4e1; border-radius: 4px; }
+.product-image { height: 118px; padding: 8px; text-align: center; background: #fff; border-bottom: 1px solid #e2e8e6; }
+.product-image img { display: inline-block; width: 210px; max-width: 100%; height: 100px; object-fit: contain; }
+.product-copy { padding: 10px 12px 12px; }
+.product-copy > span, .product-copy > strong { display: block; }
+.product-copy > span { color: #75847e; font-size: 8px; line-height: 13px; font-weight: 700; }
+.product-copy > strong { margin-top: 2px; color: #153e34; font-size: 14px; line-height: 19px; }
+.product-copy div { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.product-copy b { color: #1e4754; font-size: 10px; line-height: 15px; }
+.product-copy em { color: #16814b; font-size: 9px; line-height: 15px; font-style: normal; font-weight: 700; white-space: nowrap; }
+.email-body .price-note { margin: 7px 6px 18px; color: #738079; font-size: 10px; line-height: 15px; }
+.cta-row { margin: 22px 0 24px !important; }
+.cta-row a { display: inline-block; padding: 11px 17px; color: #fff; background: #18824b; font-size: 12px; font-weight: 700; text-decoration: none; }
+
+.signature { margin-top: 24px; border-collapse: collapse; border-top: 1px solid #dce5e2; }
+.signature td { padding-top: 18px; color: #718078; font-size: 10px; line-height: 16px; vertical-align: bottom; }
+.signature span, .signature strong, .signature a { display: block; }
+.signature strong { color: #153e34; font-size: 11px; }
+.signature a { color: #26758b; text-decoration: none; }
+.signature .signature-link { text-align: right; }
+
+@media (max-width: 700px) {
+  .preview-header { align-items: flex-start; flex-direction: column; padding: 21px 18px; }
+  main { width: calc(100% - 20px); margin-top: 16px; }
+  .review-meta { grid-template-columns: 1fr; }
+  .email { padding: 10px 0 24px; }
+  .email-table { width: 100%; }
+  .brand-row { padding: 14px 18px; }
+  .brand-row img { width: 160px; }
+  .email-intro { padding: 24px 20px; }
+  .email-intro h2 { font-size: 25px; line-height: 30px; }
+  .email-body { padding: 25px 14px 29px; }
+  .product-cell { display: block; width: 100%; padding: 5px 0; }
+  .product-grid tr { display: block; }
+  .product-image { height: 132px; }
+  .product-image img { height: 114px; }
+}
