@@ -91,10 +91,11 @@ export class EnrichmentService {
     this.config = config;
   }
 
-  async findOrganization(customer) {
+  async findOrganization(customer, { maxSearches = 2, strictErrors = false } = {}) {
     const domain = normalizeDomain(customer.website);
     if (domain) {
-      const organization = await this.apollo.enrichOrganization(domain).catch(ignoreOptionalApolloLookup);
+      const lookup = this.apollo.enrichOrganization(domain);
+      const organization = await (strictErrors ? lookup : lookup.catch(ignoreOptionalApolloLookup));
       const confidence = scoreOrganization(customer, organization);
       if (organization && confidence >= this.config.apollo.minimumCompanyScore) {
         return { organization, confidence };
@@ -104,7 +105,7 @@ export class EnrichmentService {
     let candidates = await this.apollo.searchOrganizations({
       name: customer.companyName, country, limit: 5,
     });
-    if (!candidates.length && country) {
+    if (!candidates.length && country && maxSearches > 1) {
       candidates = await this.apollo.searchOrganizations({
         name: customer.companyName, limit: 5,
       });
@@ -115,14 +116,18 @@ export class EnrichmentService {
     })).sort((left, right) => right.confidence - left.confidence)[0] || { organization: null, confidence: 0 };
   }
 
-  async findContacts(customer, contacts, organization) {
-    const max = Math.min(this.config.apollo.maxPeoplePerCompany, 5);
+  async findContacts(customer, contacts, organization, {
+    maxResults = 5, searchLimit = null, matchLimit = Infinity,
+    includeUnverified = false, strictErrors = false,
+  } = {}) {
+    const max = Math.min(this.config.apollo.maxPeoplePerCompany, maxResults, 5);
     const results = [];
     const seenEmails = new Set();
     const addResult = (person, existingContact, source) => {
       const normalizedEmail = clean(person?.email).toLowerCase();
-      if (!normalizedEmail || seenEmails.has(normalizedEmail) || results.length >= max) return;
-      seenEmails.add(normalizedEmail);
+      const key = normalizedEmail || (includeUnverified ? clean(person?.id) : '');
+      if (!key || seenEmails.has(key) || results.length >= max) return;
+      seenEmails.add(key);
       results.push({ person, existingContact, source });
     };
 
@@ -131,10 +136,11 @@ export class EnrichmentService {
       .sort((left, right) => (Number(right.primary) - Number(left.primary)) ||
         (scorePerson({ title: right.jobRole }) - scorePerson({ title: left.jobRole })));
     for (const existing of existingContacts) {
-      const matched = await this.apollo.matchPerson({
+      const lookup = this.apollo.matchPerson({
         email: existing.email,
         domain: organization?.domain || customer.website,
-      }).catch(ignoreOptionalApolloLookup);
+      });
+      const matched = await (strictErrors ? lookup : lookup.catch(ignoreOptionalApolloLookup));
       if (matched?.email) {
         addResult(matched, existing, 'apollo_match');
       } else {
@@ -150,19 +156,24 @@ export class EnrichmentService {
       domain: organization?.domain || customer.website,
       organizationId: organization?.id,
       titles: TARGET_TITLES,
-      limit: Math.min(Math.max(max * 4, 10), 25),
+      limit: searchLimit ?? Math.min(Math.max(max * 4, 10), 25),
     });
     const ranked = [...people].sort((left, right) => scorePerson(right) - scorePerson(left));
+    let matchedCount = 0;
     for (const candidate of ranked) {
-      if (results.length >= max) break;
-      const matched = await this.apollo.matchPerson({
+      if (results.length >= max || matchedCount >= matchLimit) break;
+      matchedCount += 1;
+      const lookup = this.apollo.matchPerson({
         id: candidate.id,
         firstName: candidate.firstName,
         lastName: candidate.lastName,
         domain: organization?.domain,
-      }).catch(ignoreOptionalApolloLookup);
+      });
+      const matched = await (strictErrors ? lookup : lookup.catch(ignoreOptionalApolloLookup));
       if (matched?.email && isVerified(matched)) {
         addResult(matched, findExistingContact(contacts, matched), 'apollo_search');
+      } else if (includeUnverified) {
+        addResult(matched || candidate, null, 'apollo_search');
       }
     }
     return results;

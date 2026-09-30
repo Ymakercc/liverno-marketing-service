@@ -128,6 +128,10 @@ export function createConfig({ envFile = '.env', processEnv = process.env } = {}
       secondTouchMultiOpenDelayDays: Math.min(Math.max(Number(env.SECOND_TOUCH_MULTI_OPEN_DELAY_DAYS || 2), 1), 10),
       secondTouchSingleOpenDelayDays: Math.min(Math.max(Number(env.SECOND_TOUCH_SINGLE_OPEN_DELAY_DAYS || 5), 1), 14),
     },
+    research: {
+      databasePath: env.RESEARCH_DATABASE_PATH || '.data/research.sqlite',
+      maxMatches: Math.min(Math.max(Number(env.RESEARCH_MAX_MATCHES || 3), 1), 3),
+    },
     sales: {
       teamName: env.SALES_TEAM_NAME || 'MEAN WELL KULON TEAM',
       email: env.SALES_EMAIL || 'marketing@kulon.com',

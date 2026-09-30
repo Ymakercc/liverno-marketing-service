@@ -19,12 +19,14 @@ import {
   updateMailboxSettings,
 } from './lib/mailbox-settings.mjs';
 import { MarketingStore } from './lib/marketing-store.mjs';
+import { ResearchStore } from './lib/research-store.mjs';
 import { MiMoClient } from './lib/mimo-client.mjs';
 import { getMiMoSettings, updateMiMoSettings } from './lib/mimo-settings.mjs';
 import { OpenAIClient } from './lib/openai-client.mjs';
 import { DraftService } from './services/draft-service.mjs';
 import { EnrichmentService } from './services/enrichment-service.mjs';
 import { MarketingService } from './services/marketing-service.mjs';
+import { ResearchService } from './services/research-service.mjs';
 import { MailboxMonitor } from './services/mailbox-monitor.mjs';
 import { getRelaySettings, updateRelaySettings } from './lib/relay-settings.mjs';
 import { getMarketingSettings, updateMarketingSettings } from './lib/marketing-settings.mjs';
@@ -46,6 +48,7 @@ const brevo = new BrevoClient(config.brevo);
 const drafts = new DraftService({ fumeng, openai, sales: config.sales });
 const delivery = new DeliveryStore({ databasePath: path.resolve(config.brevo.databasePath) });
 const marketingStore = new MarketingStore({ databasePath: path.resolve(config.marketing.databasePath) });
+const researchStore = new ResearchStore({ databasePath: path.resolve(config.research.databasePath) });
 const inbox = new InboxStore({ databasePath: path.resolve(config.mailbox.databasePath) });
 const mailboxMonitor = new MailboxMonitor({
   config, inbox, marketing: marketingStore, feishu, mimo,
@@ -65,6 +68,9 @@ if (recoveredImageReadyJobs) {
   console.log(`Restored ${recoveredImageReadyJobs} marketing jobs with valid product images.`);
 }
 const enrichment = new EnrichmentService({ apollo, fumeng, marketing: marketingStore, config });
+const research = new ResearchService({
+  store: researchStore, apollo, config, maxMatches: config.research.maxMatches,
+});
 const marketing = new MarketingService({
   fumeng, enrichment, drafts, marketing: marketingStore, brevo, delivery, feishu, config, priceCatalog,
   onResearchPaused: ({ reason }) => updateMarketingSettings(config, {
@@ -304,6 +310,26 @@ function deliveryPeriod(period = 'today', now = new Date()) {
 }
 
 async function handleApi(request, response, url) {
+  if (request.method === 'POST' && url.pathname === '/api/research/intake') {
+    const result = await research.intake(await readBody(request));
+    return sendJson(response, result.created ? 201 : 200, result.record);
+  }
+
+  const researchBySource = url.pathname.match(/^\/api\/research\/by-source\/([^/]+)\/([^/]+)$/);
+  if (request.method === 'GET' && researchBySource) {
+    const record = research.getBySource(
+      decodeURIComponent(researchBySource[1]), decodeURIComponent(researchBySource[2]));
+    if (!record) throw new AppError('Research record not found', { status: 404, code: 'NOT_FOUND' });
+    return sendJson(response, 200, record);
+  }
+
+  const researchById = url.pathname.match(/^\/api\/research\/([^/]+)$/);
+  if (request.method === 'GET' && researchById) {
+    const record = research.get(decodeURIComponent(researchById[1]));
+    if (!record) throw new AppError('Research record not found', { status: 404, code: 'NOT_FOUND' });
+    return sendJson(response, 200, record);
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/auth/status') {
     return sendJson(response, 200, {
       configured: webAuth.configured,
@@ -825,7 +851,8 @@ const server = http.createServer(async (request, response) => {
         || url.pathname === '/api/webhooks/brevo'
         || url.pathname === '/api/public/email-products'
         || url.pathname.startsWith('/api/automation/');
-      if (!publicApi) requireWebSession(request);
+      if (url.pathname.startsWith('/api/research/')) requireAutomationAccess(request);
+      else if (!publicApi) requireWebSession(request);
       await handleApi(request, response, url);
     } else if (request.method === 'GET') {
       const publicStatic = url.pathname === '/login.html'
@@ -893,6 +920,7 @@ function shutdown(signal) {
   server.close(() => {
     delivery.close();
     marketingStore.close();
+    researchStore.close();
     inbox.close();
     process.exit(0);
   });
