@@ -315,7 +315,8 @@ Return one JSON object matching this schema exactly: ${JSON.stringify(companyQua
     );
   }
 
-  async createOutboundDraft({ instructions, input, customerId, researchWebsite = false }) {
+  async createOutboundDraft({ instructions, input, customerId, researchWebsite = false,
+    reuseQualification = false }) {
     requireConfiguration(
       {
         OPENAI_BASE_URL: this.config.baseUrl,
@@ -326,7 +327,7 @@ Return one JSON object matching this schema exactly: ${JSON.stringify(companyQua
     );
 
     if (this.config.apiStyle === 'chat_completions') {
-      return this.createChatDraft({ instructions, input, customerId });
+      return this.createChatDraft({ instructions, input, customerId, reuseQualification });
     }
     if (this.config.apiStyle !== 'responses') {
       throw new AppError('OPENAI_API_STYLE 只支持 chat_completions 或 responses', {
@@ -390,7 +391,8 @@ Return one JSON object matching this schema exactly: ${JSON.stringify(companyQua
     };
   }
 
-  async createChatDraft({ instructions, input, customerId }) {
+  async createChatDraft({ instructions, input, customerId, reuseQualification = false }) {
+    const deepSeekHandoff = reuseQualification && isDeepSeekBaseUrl(this.config.baseUrl);
     const request = async (formatMode) => {
       const schemaInstruction = formatMode === 'strict'
         ? ''
@@ -415,6 +417,7 @@ Return one JSON object matching this schema exactly: ${JSON.stringify(companyQua
             : {}),
         max_tokens: 3200,
         user: crypto.createHash('sha256').update(String(customerId)).digest('hex').slice(0, 32),
+        ...(deepSeekHandoff ? { thinking: { type: 'disabled' } } : {}),
       };
       return this.fetch(`${this.config.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -427,17 +430,69 @@ Return one JSON object matching this schema exactly: ${JSON.stringify(companyQua
       });
     };
 
-    let formatMode = 'strict';
+    let formatMode = deepSeekHandoff ? 'json' : 'strict';
     let response = await request(formatMode);
-    if (response.status === 400 || response.status === 422) {
+    if (!deepSeekHandoff && (response.status === 400 || response.status === 422)) {
       formatMode = 'json';
       response = await request(formatMode);
     }
-    if (response.status === 400 || response.status === 422) {
+    if (!deepSeekHandoff && (response.status === 400 || response.status === 422)) {
       formatMode = 'plain';
       response = await request(formatMode);
     }
     let data = await readJsonResponse(response, '大模型中转站');
+    if (deepSeekHandoff) {
+      const choice = data?.choices?.[0];
+      const content = choice?.message?.content;
+      const reasoningTokens = data?.usage?.completion_tokens_details?.reasoning_tokens;
+      const details = {
+        finishReason: choice?.finish_reason || null,
+        contentType: content === null ? 'null' : typeof content,
+        contentLength: typeof content === 'string' ? content.length : null,
+        reasoningTokens: Number.isInteger(reasoningTokens) ? reasoningTokens : null,
+      };
+      if (details.finishReason === 'length') {
+        throw new AppError('大模型草稿输出被截断', {
+          status: 502, code: 'OPENAI_OUTPUT_TRUNCATED', details,
+        });
+      }
+      if (details.finishReason && details.finishReason !== 'stop') {
+        throw new AppError('大模型草稿输出未正常完成', {
+          status: 502, code: 'OPENAI_INCOMPLETE_OUTPUT', details,
+        });
+      }
+      if (typeof content !== 'string') {
+        throw new AppError('大模型草稿响应包装不符合预期', {
+          status: 502, code: 'OPENAI_INVALID_OUTPUT',
+          details: { ...details, invalidFormat: 'response_wrapper' },
+        });
+      }
+      if (!content.trim()) {
+        throw new AppError('大模型中转站没有返回可用的草稿内容', {
+          status: 502, code: 'OPENAI_EMPTY_OUTPUT', details,
+        });
+      }
+      let draft;
+      try {
+        draft = parseDraft(content, data?.id);
+      } catch (error) {
+        let invalidFormat = 'schema';
+        try {
+          JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
+        } catch {
+          invalidFormat = 'json_syntax';
+        }
+        throw new AppError(error.message, {
+          status: error.status || 502, code: error.code || 'OPENAI_INVALID_OUTPUT',
+          details: { ...details, invalidFormat },
+        });
+      }
+      return {
+        ...draft,
+        debug: { model: data?.model || this.config.model, responseId: data?.id || '',
+          usedWebSearch: false, apiStyle: 'chat_completions' },
+      };
+    }
     let outputText = extractChatText(data);
     if (!outputText) {
       throw new AppError('大模型中转站没有返回可用的草稿内容', {

@@ -41,6 +41,7 @@ test('draft service selects an emailed contact and excludes email from model inp
   assert.match(modelRequest.input, /Aarav/);
   assert.doesNotMatch(modelRequest.input, /aarav@example\.com/);
   assert.match(modelRequest.instructions, /MEAN WELL KULON TEAM/);
+  assert.equal(modelRequest.reuseQualification, false);
   assert.match(modelRequest.instructions, /Do not add a sender name/);
   assert.match(modelRequest.instructions, /Do not require proof of an active sourcing project/);
   assert.doesNotMatch(modelRequest.instructions, /WhatsApp:/);
@@ -109,6 +110,7 @@ test('prequalified Liverno draft reuses C1 evidence without website fetch or ano
   assert.equal(result.draft.qualified, true);
   assert.equal(result.draft.qualificationReason, 'Completed C1 decision');
   assert.match(modelRequest.instructions, /Do not reassess company fit/);
+  assert.equal(modelRequest.reuseQualification, true);
   assert.match(modelRequest.input, /without reassessing it/);
   assert.doesNotMatch(modelRequest.input, /buyer@verified\.example/);
 });

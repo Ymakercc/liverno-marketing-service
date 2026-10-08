@@ -108,6 +108,125 @@ test('relay client retries when structured output contains internal reasoning te
   assert.equal(result.qualificationReason, draft.qualificationReason);
 });
 
+test('prequalified DeepSeek draft uses non-thinking JSON mode once', async () => {
+  let calls = 0;
+  const client = new OpenAIClient(
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'fake-key', model: 'deepseek-flash',
+      apiStyle: 'chat_completions' },
+    { fetchImpl: async (_url, options) => {
+      calls += 1;
+      const body = JSON.parse(options.body);
+      assert.equal(body.response_format.type, 'json_object');
+      assert.deepEqual(body.thinking, { type: 'disabled' });
+      assert.equal(body.max_tokens, 3200);
+      assert.match(body.messages[0].content, /JSON Schema/);
+      return new Response(JSON.stringify({ id: 'fake-response', choices: [{ finish_reason: 'stop',
+        message: { content: JSON.stringify({ ...draft, reviewRequired: false }) } }] }), { status: 200 });
+    } },
+  );
+  const result = await client.createOutboundDraft({ instructions: 'Draft', input: '{}',
+    customerId: 'local-1', reuseQualification: true });
+  assert.equal(calls, 1);
+  assert.equal(result.emailSubject, draft.emailSubject);
+  assert.equal(result.debug.apiStyle, 'chat_completions');
+});
+
+test('prequalified DeepSeek draft classifies empty, truncated, and abnormal responses safely', async () => {
+  for (const [content, finishReason, code] of [
+    ['', 'stop', 'OPENAI_EMPTY_OUTPUT'],
+    ['{"emailSubject":', 'length', 'OPENAI_OUTPUT_TRUNCATED'],
+    [JSON.stringify(draft), 'content_filter', 'OPENAI_INCOMPLETE_OUTPUT'],
+  ]) {
+    let calls = 0;
+    const client = new OpenAIClient(
+      { baseUrl: 'https://api.deepseek.com', apiKey: 'fake-key', model: 'deepseek-flash',
+        apiStyle: 'chat_completions' },
+      { fetchImpl: async () => {
+        calls += 1;
+        return new Response(JSON.stringify({ choices: [{ finish_reason: finishReason,
+          message: { content, reasoning_content: 'private reasoning' } }],
+        usage: { completion_tokens_details: { reasoning_tokens: 3200 } } }), { status: 200 });
+      } },
+    );
+    await assert.rejects(client.createOutboundDraft({ instructions: 'Draft', input: '{}',
+      customerId: 'local-1', reuseQualification: true }), (error) => {
+      assert.equal(error.code, code);
+      assert.deepEqual(error.details, { finishReason, contentType: 'string',
+        contentLength: content.length, reasoningTokens: 3200 });
+      assert.doesNotMatch(JSON.stringify(error.details), /private reasoning|emailSubject/);
+      return true;
+    });
+    assert.equal(calls, 1);
+  }
+});
+
+test('prequalified DeepSeek draft rejects missing chat content and HTTP errors without fallback', async () => {
+  for (const [response, code, invalidFormat] of [
+    [new Response(JSON.stringify({ choices: [] }), { status: 200 }), 'OPENAI_INVALID_OUTPUT', 'response_wrapper'],
+    [new Response(JSON.stringify({ error: { message: 'unsupported' } }), { status: 400 }),
+      'UPSTREAM_HTTP_ERROR', undefined],
+  ]) {
+    let calls = 0;
+    const client = new OpenAIClient(
+      { baseUrl: 'https://api.deepseek.com', apiKey: 'fake-key', model: 'deepseek-flash',
+        apiStyle: 'chat_completions' },
+      { fetchImpl: async () => { calls += 1; return response; } },
+    );
+    await assert.rejects(client.createOutboundDraft({ instructions: 'Draft', input: '{}',
+      customerId: 'local-1', reuseQualification: true }), (error) => {
+      assert.equal(error.code, code);
+      if (invalidFormat) assert.equal(error.details.invalidFormat, invalidFormat);
+      return true;
+    });
+    assert.equal(calls, 1);
+  }
+});
+
+test('prequalified DeepSeek draft separates JSON syntax and schema failures without content', async () => {
+  for (const [content, invalidFormat] of [
+    ['{"private email":"buyer@example.com",', 'json_syntax'],
+    [JSON.stringify({ ...draft, emailBody: null }), 'schema'],
+  ]) {
+    const client = new OpenAIClient(
+      { baseUrl: 'https://api.deepseek.com', apiKey: 'fake-key', model: 'deepseek-flash',
+        apiStyle: 'chat_completions' },
+      { fetchImpl: async () => new Response(JSON.stringify({ choices: [{ finish_reason: 'stop',
+        message: { content } }] }), { status: 200 }) },
+    );
+    await assert.rejects(client.createOutboundDraft({ instructions: 'Draft', input: '{}',
+      customerId: 'local-1', reuseQualification: true }), (error) => {
+      assert.equal(error.code, 'OPENAI_INVALID_OUTPUT');
+      assert.equal(error.details.invalidFormat, invalidFormat);
+      assert.equal(error.details.contentLength, content.length);
+      assert.doesNotMatch(JSON.stringify(error.details), /buyer@example\.com|emailBody/);
+      return true;
+    });
+  }
+});
+
+test('ordinary DeepSeek drafts retain the existing strict-schema fallback path', async () => {
+  let calls = 0;
+  const client = new OpenAIClient(
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'fake-key', model: 'deepseek-flash',
+      apiStyle: 'chat_completions' },
+    { fetchImpl: async (_url, options) => {
+      calls += 1;
+      const body = JSON.parse(options.body);
+      assert.equal('thinking' in body, false);
+      if (calls === 1) {
+        assert.equal(body.response_format.type, 'json_schema');
+        return new Response(JSON.stringify({ error: { message: 'unsupported' } }), { status: 400 });
+      }
+      assert.equal(body.response_format.type, 'json_object');
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(draft) } }] }),
+        { status: 200 });
+    } },
+  );
+  assert.equal((await client.createOutboundDraft({ instructions: 'Draft', input: '{}',
+    customerId: 'fumeng-1' })).emailSubject, draft.emailSubject);
+  assert.equal(calls, 2);
+});
+
 test('qualification-only request uses its own schema and never asks for email content', async () => {
   let calls = 0;
   const client = new OpenAIClient(

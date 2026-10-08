@@ -115,6 +115,36 @@ test('repeated Handoff returns the same customer and job without Apollo or draft
   assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_jobs').get().count, 1);
 });
 
+test('failed AI handoff preserves one customer and retries external preparation only on a new POST', async (t) => {
+  const { service, marketing, calls } = fixture(t);
+  const generateDraft = service.drafts.generateFromData.bind(service.drafts);
+  service.drafts.generateFromData = async () => {
+    calls.draft += 1;
+    throw Object.assign(new Error('No draft content'), { code: 'OPENAI_EMPTY_OUTPUT' });
+  };
+  await assert.rejects(service.intake(SOURCE_ID), { code: 'OPENAI_EMPTY_OUTPUT' });
+  const failed = marketing.getMarketingCustomer('liverno', SOURCE_ID);
+  assert.equal(failed.handoffStatus, 'failed');
+  assert.equal(failed.failureReason, 'OPENAI_EMPTY_OUTPUT');
+  assert.deepEqual(calls, { apollo: 1, draft: 1 });
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_customers').get().count, 1);
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_contacts').get().count, 0);
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_jobs').get().count, 0);
+
+  service.drafts.generateFromData = generateDraft;
+  const recovered = await service.intake(SOURCE_ID);
+  assert.equal(recovered.status, 'queued');
+  assert.equal(recovered.marketingCustomerId, failed.id);
+  assert.deepEqual(calls, { apollo: 2, draft: 2 });
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_customers').get().count, 1);
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_contacts').get().count, 1);
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_jobs').get().count, 1);
+
+  assert.deepEqual(await service.intake(SOURCE_ID), recovered);
+  assert.deepEqual(calls, { apollo: 2, draft: 2 });
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_jobs').get().count, 1);
+});
+
 test('retry recovers an already enqueued job after an interrupted status update', async (t) => {
   const { service, marketing, calls } = fixture(t);
   const customer = marketing.ensureLivernoCustomer(research());

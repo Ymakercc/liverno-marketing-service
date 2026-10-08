@@ -195,6 +195,7 @@ export class DraftService {
         organizationEvidence, reuseQualification),
       customerId: customer.id,
       researchWebsite,
+      reuseQualification,
     });
     const resolvedDraft = qualificationDecision?.qualified === true
       ? {
