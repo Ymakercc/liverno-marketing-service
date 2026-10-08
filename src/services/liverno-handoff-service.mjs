@@ -6,6 +6,12 @@ import { draftQuality, selectEmailProducts } from './marketing-service.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IMAGE_SOURCES = new Set(['exact_model_asset', 'exact_model_manifest', 'base_model_asset']);
+const FUMENG_SCAN_LIMIT = 100;
+const FUMENG_SCAN_DEADLINE_MS = 65_000;
+
+function normalizedName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
 
 function validEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
@@ -26,13 +32,74 @@ function summary(customer) {
 }
 
 export class LivernoHandoffService {
-  constructor({ research, marketing, apollo, drafts, config, priceCatalog }) {
+  constructor({ research, marketing, apollo, drafts, config, priceCatalog, fumeng }) {
     this.research = research;
     this.marketing = marketing;
     this.apollo = apollo;
     this.drafts = drafts;
     this.config = config;
     this.priceCatalog = priceCatalog;
+    this.fumeng = fumeng;
+    this.dedupChecks = new Map();
+  }
+
+  async checkCrossSource(sourceId) {
+    if (!UUID.test(String(sourceId || ''))) {
+      throw new AppError('Invalid Liverno Enterprise ID', { status: 400, code: 'INVALID_SOURCE_ID' });
+    }
+    const pending = this.dedupChecks.get(sourceId);
+    if (pending) return pending;
+    const check = this.runCrossSourceCheck(sourceId);
+    this.dedupChecks.set(sourceId, check);
+    try {
+      return await check;
+    } finally {
+      this.dedupChecks.delete(sourceId);
+    }
+  }
+
+  async runCrossSourceCheck(sourceId) {
+    const record = this.research.getBySource('liverno', sourceId);
+    if (!record) throw new AppError('Research record not found', { status: 404, code: 'NOT_FOUND' });
+    const domain = getDomain(record.domain);
+    if (!domain || domain !== getDomain(record.company?.domain)) {
+      return { status: 'unknown', reason: 'identity_domain_mismatch' };
+    }
+    const customer = this.marketing.getMarketingCustomer('liverno', sourceId);
+    const recipient = customer ? this.marketing.findLivernoJob(customer.id)?.email || '' : '';
+    if (this.marketing.findLivernoConflict({ sourceId, domain, recipient }) ||
+        (recipient && this.marketing.isSuppressed(recipient))) {
+      return { status: 'duplicate', reason: 'local_marketing_or_suppression' };
+    }
+    if (!this.fumeng?.listCustomers) return { status: 'unknown', reason: 'fumeng_unavailable' };
+
+    const name = normalizedName(record.company?.apollo_name);
+    let from = 0;
+    const deadline = Date.now() + FUMENG_SCAN_DEADLINE_MS;
+    try {
+      while (from < FUMENG_SCAN_LIMIT) {
+        if (Date.now() >= deadline) return { status: 'unknown', reason: 'fumeng_scan_timeout' };
+        const page = await this.fumeng.listCustomers({ scope: 'all', from, size: 50 });
+        if (!Number.isSafeInteger(page.total) || page.total < 0 ||
+            !Array.isArray(page.items) || page.items.length > 50 ||
+            (from < page.total && page.items.length === 0)) {
+          return { status: 'unknown', reason: 'fumeng_incomplete_page' };
+        }
+        for (const item of page.items) {
+          if ((item.website && getDomain(item.website) === domain) ||
+              (name && normalizedName(item.companyName) === name) ||
+              (recipient && String(item.mainContactEmail || '').trim().toLowerCase() === recipient)) {
+            return { status: 'duplicate', reason: 'fumeng_customer_match' };
+          }
+        }
+        from += page.items.length;
+        if (from >= page.total) break;
+      }
+      // `scope=all` does not prove that this token can see every Fumeng owner or contact.
+      return { status: 'unknown', reason: from >= FUMENG_SCAN_LIMIT ? 'fumeng_scan_limit' : 'fumeng_scope_unverified' };
+    } catch {
+      return { status: 'unknown', reason: 'fumeng_query_failed' };
+    }
   }
 
   async intake(sourceId) {

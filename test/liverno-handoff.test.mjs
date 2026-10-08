@@ -178,6 +178,102 @@ test('mismatched Liverno and Apollo domains block before marketing persistence',
   assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_customers').get().count, 0);
 });
 
+test('cross-source check detects a Fumeng domain or exact company match without writing locally', async (t) => {
+  const { service, marketing, calls } = fixture(t);
+  let pages = 0;
+  service.fumeng = { async listCustomers({ scope, from, size }) {
+    assert.equal(scope, 'all');
+    assert.equal(size, 50);
+    pages += 1;
+    return from === 0
+      ? { total: 2, items: [{ id: 'fm-1', companyName: 'Other', website: 'https://other.test' }] }
+      : { total: 2, items: [{ id: 'fm-2', companyName: 'Verified Automation', website: '' }] };
+  } };
+  assert.deepEqual(await service.checkCrossSource(SOURCE_ID), {
+    status: 'duplicate', reason: 'fumeng_customer_match',
+  });
+  assert.equal(pages, 2);
+  assert.deepEqual(calls, { apollo: 0, draft: 0 });
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_customers').get().count, 0);
+});
+
+test('cross-source check detects matching Fumeng main-contact email from an existing queued job', async (t) => {
+  const { service, marketing } = fixture(t);
+  const customer = marketing.ensureLivernoCustomer(research());
+  marketing.enqueue({ source: 'liverno', sourceId: SOURCE_ID, customerId: customer.id,
+    domain: 'example.com', email: 'buyer@example.com', subject: 'Draft' });
+  service.fumeng = { async listCustomers() {
+    return { total: 1, items: [{ id: 'fm-1', companyName: 'Other',
+      website: 'other.test', mainContactEmail: 'BUYER@example.com' }] };
+  } };
+  assert.deepEqual(await service.checkCrossSource(SOURCE_ID), {
+    status: 'duplicate', reason: 'fumeng_customer_match',
+  });
+  assert.equal(marketing.getJob(marketing.findLivernoJob(customer.id).id).status, 'queued');
+});
+
+test('cross-source scan caps Fumeng list requests at two pages', async (t) => {
+  const { service } = fixture(t);
+  let calls = 0;
+  service.fumeng = { async listCustomers() {
+    calls += 1;
+    return { total: 101, items: Array.from({ length: 50 }, (_, index) => ({
+      id: `fm-${calls}-${index}`, companyName: 'Other', website: 'other.test',
+    })) };
+  } };
+  assert.deepEqual(await service.checkCrossSource(SOURCE_ID), {
+    status: 'unknown', reason: 'fumeng_scan_limit',
+  });
+  assert.equal(calls, 2);
+});
+
+test('no visible Fumeng match stays unknown because all-scope permission is unverified', async (t) => {
+  const { service } = fixture(t);
+  service.fumeng = { async listCustomers() { return { total: 0, items: [] }; } };
+  assert.deepEqual(await service.checkCrossSource(SOURCE_ID), {
+    status: 'unknown', reason: 'fumeng_scope_unverified',
+  });
+});
+
+test('incomplete Fumeng pagination, permission errors and network failures stay unknown', async (t) => {
+  const { service } = fixture(t);
+  service.fumeng = { async listCustomers() { return { total: 10, items: [] }; } };
+  assert.equal((await service.checkCrossSource(SOURCE_ID)).reason, 'fumeng_incomplete_page');
+  for (const message of ['permission denied', 'network down']) {
+    service.fumeng = { async listCustomers() { throw new Error(message); } };
+    assert.deepEqual(await service.checkCrossSource(SOURCE_ID), {
+      status: 'unknown', reason: 'fumeng_query_failed',
+    });
+  }
+});
+
+test('local duplicate and suppression win without querying Fumeng', async (t) => {
+  const { service, marketing } = fixture(t);
+  let remoteCalls = 0;
+  service.fumeng = { async listCustomers() { remoteCalls += 1; throw new Error('unexpected'); } };
+  marketing.enqueue({ customerId: 'fm-1', domain: 'example.com', email: 'other@test.com', subject: 'Existing' });
+  assert.equal((await service.checkCrossSource(SOURCE_ID)).status, 'duplicate');
+  assert.equal(remoteCalls, 0);
+});
+
+test('concurrent checks share one Fumeng request and repeat checks stay read-only', async (t) => {
+  const { service, marketing } = fixture(t);
+  let calls = 0;
+  service.fumeng = { async listCustomers() {
+    calls += 1;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return { total: 0, items: [] };
+  } };
+  const results = await Promise.all([
+    service.checkCrossSource(SOURCE_ID), service.checkCrossSource(SOURCE_ID),
+  ]);
+  assert.deepEqual(results[0], results[1]);
+  assert.equal(calls, 1);
+  assert.deepEqual(await service.checkCrossSource(SOURCE_ID), results[0]);
+  assert.equal(calls, 2);
+  assert.equal(marketing.db.prepare('SELECT COUNT(*) AS count FROM marketing_jobs').get().count, 0);
+});
+
 test('existing Fumeng job on the same domain blocks Liverno before person match', async (t) => {
   const { service, marketing, calls } = fixture(t);
   marketing.enqueue({ customerId: 'fumeng-123', email: 'other@example.com',

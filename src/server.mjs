@@ -82,7 +82,7 @@ const marketing = new MarketingService({
   }),
 });
 const livernoHandoff = new LivernoHandoffService({
-  research: researchStore, marketing: marketingStore, apollo, drafts, config, priceCatalog,
+  research: researchStore, marketing: marketingStore, apollo, drafts, config, priceCatalog, fumeng,
 });
 let dailyMarketingRun = null;
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
@@ -316,6 +316,11 @@ function deliveryPeriod(period = 'today', now = new Date()) {
 }
 
 async function handleApi(request, response, url) {
+  const livernoDedupMatch = url.pathname.match(/^\/api\/research\/by-source\/liverno\/([^/]+)\/cross-source-dedup$/);
+  if (request.method === 'GET' && livernoDedupMatch) {
+    const result = await livernoHandoff.checkCrossSource(decodeURIComponent(livernoDedupMatch[1]));
+    return sendJson(response, 200, result);
+  }
   const livernoHandoffMatch = url.pathname.match(/^\/api\/research\/by-source\/liverno\/([^/]+)\/handoff$/);
   if (request.method === 'POST' && livernoHandoffMatch) {
     const result = await livernoHandoff.intake(decodeURIComponent(livernoHandoffMatch[1]));

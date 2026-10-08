@@ -288,6 +288,16 @@ test('HTTP intake requires Automation Bearer and never touches marketing jobs or
   const bySource = await fetch(`${base}/api/research/by-source/liverno/${SOURCE_ID}`, { headers });
   assert.equal(bySource.status, 200);
   assert.equal((await bySource.json()).id, created.id);
+  const dedupUrl = `${base}/api/research/by-source/liverno/${SOURCE_ID}/cross-source-dedup`;
+  assert.equal((await fetch(dedupUrl)).status, 401);
+  assert.equal((await fetch(dedupUrl, {
+    headers: { authorization: 'Bearer wrong' },
+  })).status, 401);
+  const dedup = await fetch(dedupUrl, { headers });
+  assert.equal(dedup.status, 200);
+  const dedupBody = await dedup.json();
+  assert.equal(dedupBody.status, 'unknown');
+  assert.equal(JSON.stringify(dedupBody).includes('@'), false);
   assert.deepEqual(upstreamCalls, [
     '/api/v1/organizations/enrich', '/api/v1/mixed_people/api_search', '/api/v1/people/match',
   ]);
