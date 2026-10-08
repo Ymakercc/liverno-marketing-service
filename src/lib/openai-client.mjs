@@ -91,25 +91,72 @@ export const companyQualificationSchema = {
     'industry', 'customerType', 'customerProfile', 'painPoints', 'recommendedProducts', 'riskFlags'],
 };
 
-function parseQualification(outputText) {
+function qualificationOutputError(message, code, details) {
+  return new AppError(message, { status: 502, code, details });
+}
+
+function qualificationResponseDetails(response, endpoint) {
+  const choice = endpoint === '/chat/completions' ? response?.choices?.[0] : null;
+  const content = choice?.message?.content;
+  const reasoningTokens = response?.usage?.completion_tokens_details?.reasoning_tokens;
+  return {
+    finishReason: choice?.finish_reason || null,
+    contentType: content === null ? 'null' : typeof content,
+    contentLength: typeof content === 'string' ? content.length : null,
+    reasoningTokens: Number.isInteger(reasoningTokens) ? reasoningTokens : null,
+  };
+}
+
+function isDeepSeekBaseUrl(baseUrl) {
+  try { return /(^|\.)deepseek\.com$/i.test(new URL(baseUrl).hostname); }
+  catch { return false; }
+}
+
+function parseQualification(outputText, details = {}) {
+  if (details.finishReason === 'length') {
+    throw qualificationOutputError('AI 企业判断输出被截断', 'QUALIFICATION_OUTPUT_TRUNCATED', details);
+  }
+  if (typeof outputText !== 'string') {
+    throw qualificationOutputError('AI 企业判断响应包装不符合预期', 'QUALIFICATION_INVALID_OUTPUT',
+      { ...details, invalidFormat: 'response_wrapper' });
+  }
+  if (!outputText.trim()) {
+    throw qualificationOutputError('AI 企业判断正文为空', 'QUALIFICATION_EMPTY_OUTPUT', details);
+  }
   let result;
   try {
-    const text = String(outputText || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    const text = outputText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
     result = JSON.parse(text);
   } catch {
-    throw new AppError('AI 企业判断不是有效 JSON', { status: 502, code: 'QUALIFICATION_INVALID_OUTPUT' });
+    throw qualificationOutputError('AI 企业判断不是有效 JSON', 'QUALIFICATION_INVALID_OUTPUT',
+      { ...details, invalidFormat: 'json_syntax' });
   }
   const strings = ['qualificationReason', 'country', 'region', 'industry', 'customerType', 'customerProfile'];
   const lists = ['painPoints', 'riskFlags'];
-  if (!result || ![true, false, null].includes(result.qualified) ||
-      typeof result.reviewRequired !== 'boolean' ||
-      strings.some((field) => typeof result[field] !== 'string') ||
-      lists.some((field) => !Array.isArray(result[field]) ||
-        result[field].some((item) => typeof item !== 'string')) ||
-      !Array.isArray(result.recommendedProducts) ||
-      result.recommendedProducts.some((item) => typeof item?.name !== 'string' ||
-        typeof item?.reason !== 'string')) {
-    throw new AppError('AI 企业判断缺少必要字段', { status: 502, code: 'QUALIFICATION_INVALID_OUTPUT' });
+  const typeOf = (value) => value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+  const invalidFields = [];
+  const addInvalid = (field, value) => invalidFields.push({ field, type: typeOf(value) });
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    addInvalid('root', result);
+  } else {
+    if (![true, false, null].includes(result.qualified)) addInvalid('qualified', result.qualified);
+    if (typeof result.reviewRequired !== 'boolean') addInvalid('reviewRequired', result.reviewRequired);
+    for (const field of strings) {
+      if (typeof result[field] !== 'string') addInvalid(field, result[field]);
+    }
+    for (const field of lists) {
+      if (!Array.isArray(result[field])) addInvalid(field, result[field]);
+      else if (result[field].some((item) => typeof item !== 'string')) addInvalid(`${field}[]`, result[field].find((item) => typeof item !== 'string'));
+    }
+    if (!Array.isArray(result.recommendedProducts)) addInvalid('recommendedProducts', result.recommendedProducts);
+    else for (const item of result.recommendedProducts) {
+      if (typeof item?.name !== 'string') addInvalid('recommendedProducts[].name', item?.name);
+      if (typeof item?.reason !== 'string') addInvalid('recommendedProducts[].reason', item?.reason);
+    }
+  }
+  if (invalidFields.length) {
+    throw qualificationOutputError('AI 企业判断缺少必要字段', 'QUALIFICATION_INVALID_OUTPUT',
+      { ...details, invalidFormat: 'schema', invalidFields });
   }
   return result;
 }
@@ -239,6 +286,7 @@ Return one JSON object matching this schema exactly: ${JSON.stringify(companyQua
         response_format: { type: 'json_object' },
         max_tokens: 1800,
         user: identifier,
+        ...(isDeepSeekBaseUrl(this.config.baseUrl) ? { thinking: { type: 'disabled' } } : {}),
       };
     } else if (this.config.apiStyle === 'responses') {
       endpoint = '/responses';
@@ -261,7 +309,10 @@ Return one JSON object matching this schema exactly: ${JSON.stringify(companyQua
       signal: AbortSignal.timeout(90_000),
     });
     const data = await readJsonResponse(response, '大模型中转站');
-    return parseQualification(endpoint === '/responses' ? extractOutputText(data) : extractChatText(data));
+    return parseQualification(
+      endpoint === '/responses' ? extractOutputText(data) : data?.choices?.[0]?.message?.content,
+      qualificationResponseDetails(data, endpoint),
+    );
   }
 
   async createOutboundDraft({ instructions, input, customerId, researchWebsite = false }) {

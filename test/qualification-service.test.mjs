@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { OpenAIClient } from '../src/lib/openai-client.mjs';
 import { ResearchStore } from '../src/lib/research-store.mjs';
 import { QualificationService } from '../src/services/qualification-service.mjs';
 
@@ -200,6 +201,27 @@ test('AI transport failure is persisted as failed and never retries automaticall
   await item.service.qualify(item.id);
   assert.equal(item.calls.website.length, 1);
   assert.equal(item.calls.ai.length, 1);
+});
+
+test('truncated DeepSeek output stays failed and does not repeat AI on replay', async (t) => {
+  const item = fixture(t);
+  let aiCalls = 0;
+  item.service.openai = new OpenAIClient(
+    { baseUrl: 'https://api.deepseek.com', apiKey: 'fake-key', model: 'deepseek-flash',
+      apiStyle: 'chat_completions' },
+    { fetchImpl: async () => {
+      aiCalls += 1;
+      return new Response(JSON.stringify({ choices: [{ finish_reason: 'length',
+        message: { content: '{"qualified":true' } }] }), { status: 200 });
+    } },
+  );
+  const record = await item.service.qualify(item.id);
+  assert.equal(record.qualification.status, 'failed');
+  assert.equal(record.qualification.failure_reason, 'QUALIFICATION_OUTPUT_TRUNCATED');
+  assert.equal(record.qualification.qualified, null);
+  assert.equal((await item.service.qualify(item.id)).qualification.status, 'failed');
+  assert.equal(item.calls.website.length, 1);
+  assert.equal(aiCalls, 1);
 });
 
 test('website and AI emails are redacted before model input and storage', async (t) => {
