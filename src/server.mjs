@@ -28,6 +28,7 @@ import { EnrichmentService } from './services/enrichment-service.mjs';
 import { MarketingService } from './services/marketing-service.mjs';
 import { ResearchService } from './services/research-service.mjs';
 import { QualificationService } from './services/qualification-service.mjs';
+import { LivernoHandoffService } from './services/liverno-handoff-service.mjs';
 import { MailboxMonitor } from './services/mailbox-monitor.mjs';
 import { getRelaySettings, updateRelaySettings } from './lib/relay-settings.mjs';
 import { getMarketingSettings, updateMarketingSettings } from './lib/marketing-settings.mjs';
@@ -79,6 +80,9 @@ const marketing = new MarketingService({
     researchEnabled: false,
     researchPauseReason: reason,
   }),
+});
+const livernoHandoff = new LivernoHandoffService({
+  research: researchStore, marketing: marketingStore, apollo, drafts, config, priceCatalog,
 });
 let dailyMarketingRun = null;
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
@@ -312,6 +316,21 @@ function deliveryPeriod(period = 'today', now = new Date()) {
 }
 
 async function handleApi(request, response, url) {
+  const livernoHandoffMatch = url.pathname.match(/^\/api\/research\/by-source\/liverno\/([^/]+)\/handoff$/);
+  if (request.method === 'POST' && livernoHandoffMatch) {
+    const result = await livernoHandoff.intake(decodeURIComponent(livernoHandoffMatch[1]));
+    return sendJson(response, 200, result);
+  }
+  if (request.method === 'GET' && livernoHandoffMatch) {
+    const customer = marketingStore.getMarketingCustomer('liverno', decodeURIComponent(livernoHandoffMatch[1]));
+    if (!customer) throw new AppError('Marketing customer not found', { status: 404, code: 'NOT_FOUND' });
+    return sendJson(response, 200, {
+      source: customer.source, sourceId: customer.sourceId, researchId: customer.researchId,
+      qualificationStatus: customer.qualificationStatus,
+      marketingCustomerId: customer.id, fumengCustomerId: customer.fumengCustomerId,
+      status: customer.handoffStatus, jobId: customer.jobId, failureReason: customer.failureReason,
+    });
+  }
   if (request.method === 'POST' && url.pathname === '/api/research/intake') {
     const result = await research.intake(await readBody(request));
     return sendJson(response, result.created ? 201 : 200, result.record);

@@ -27,6 +27,12 @@ function parseJson(value, fallback) {
 function mapJob(row) {
   return {
     id: row.id,
+    source: row.source || 'fumeng',
+    sourceId: row.source_id || row.customer_id,
+    researchId: row.research_id || '',
+    domain: row.domain || '',
+    marketingCustomerId: row.source === 'liverno' ? row.customer_id : '',
+    fumengCustomerId: row.source === 'liverno' ? '' : row.customer_id,
     campaign: row.campaign,
     customerId: row.customer_id,
     contactId: row.contact_id,
@@ -59,6 +65,12 @@ function mapPublicJob(row) {
   const job = mapJob(row);
   return {
     id: job.id,
+    source: job.source,
+    sourceId: job.sourceId,
+    researchId: job.researchId,
+    domain: job.domain,
+    marketingCustomerId: job.marketingCustomerId,
+    fumengCustomerId: job.fumengCustomerId,
     campaign: job.campaign,
     customerId: job.customerId,
     contactId: job.contactId,
@@ -175,6 +187,24 @@ export class MarketingStore {
         contacts_created INTEGER NOT NULL DEFAULT 0
       );
       CREATE INDEX IF NOT EXISTS screening_batches_completed_idx ON screening_batches(completed_at);
+      CREATE TABLE IF NOT EXISTS marketing_customers (
+        id TEXT PRIMARY KEY, source TEXT NOT NULL, source_id TEXT NOT NULL,
+        research_id TEXT NOT NULL, fumeng_customer_id TEXT NOT NULL DEFAULT '',
+        domain TEXT NOT NULL, company_name TEXT NOT NULL,
+        qualification_status TEXT NOT NULL, handoff_status TEXT NOT NULL,
+        job_id TEXT NOT NULL DEFAULT '', failure_reason TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        UNIQUE(source, source_id)
+      );
+      CREATE INDEX IF NOT EXISTS marketing_customers_domain_idx ON marketing_customers(domain);
+      CREATE TABLE IF NOT EXISTS marketing_contacts (
+        id TEXT PRIMARY KEY, marketing_customer_id TEXT NOT NULL,
+        apollo_person_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL DEFAULT '', email TEXT NOT NULL, email_status TEXT NOT NULL,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        UNIQUE(marketing_customer_id, apollo_person_id),
+        FOREIGN KEY(marketing_customer_id) REFERENCES marketing_customers(id)
+      );
     `);
     try {
       this.db.exec("ALTER TABLE marketing_jobs ADD COLUMN feishu_record_id TEXT NOT NULL DEFAULT ''");
@@ -187,6 +217,10 @@ export class MarketingStore {
       "ALTER TABLE enrichment_runs ADD COLUMN feishu_sync_error TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE marketing_exclusions ADD COLUMN resolved_at TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE marketing_exclusions ADD COLUMN resolution TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE marketing_jobs ADD COLUMN source TEXT NOT NULL DEFAULT 'fumeng'",
+      "ALTER TABLE marketing_jobs ADD COLUMN source_id TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE marketing_jobs ADD COLUMN research_id TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE marketing_jobs ADD COLUMN domain TEXT NOT NULL DEFAULT ''",
     ];
     for (const statement of migrations) {
       try { this.db.exec(statement); }
@@ -195,6 +229,92 @@ export class MarketingStore {
       }
     }
     this.backfillTodayScreeningBatch();
+  }
+
+  getMarketingCustomer(source, sourceId) {
+    const row = this.db.prepare(
+      'SELECT * FROM marketing_customers WHERE source = ? AND source_id = ?',
+    ).get(clean(source), clean(sourceId));
+    return row ? {
+      id: row.id, source: row.source, sourceId: row.source_id,
+      researchId: row.research_id, fumengCustomerId: row.fumeng_customer_id,
+      domain: row.domain, companyName: row.company_name,
+      qualificationStatus: row.qualification_status, handoffStatus: row.handoff_status,
+      jobId: row.job_id, failureReason: row.failure_reason,
+      createdAt: row.created_at, updatedAt: row.updated_at,
+    } : null;
+  }
+
+  ensureLivernoCustomer(record) {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT OR IGNORE INTO marketing_customers
+        (id, source, source_id, research_id, domain, company_name,
+         qualification_status, handoff_status, created_at, updated_at)
+      VALUES (?, 'liverno', ?, ?, ?, ?, 'qualified', 'received', ?, ?)
+    `).run(crypto.randomUUID(), record.source_id, record.id, record.domain,
+      record.company.apollo_name, now, now);
+    return this.getMarketingCustomer('liverno', record.source_id);
+  }
+
+  claimLivernoHandoff(id) {
+    return this.db.prepare(`
+      UPDATE marketing_customers SET handoff_status = 'preparing', failure_reason = '', updated_at = ?
+      WHERE id = ? AND handoff_status IN ('received', 'failed')
+    `).run(new Date().toISOString(), clean(id)).changes === 1;
+  }
+
+  finishLivernoHandoff(id, jobId) {
+    this.db.prepare(`
+      UPDATE marketing_customers SET handoff_status = 'queued', job_id = ?,
+        failure_reason = '', updated_at = ?
+      WHERE id = ? AND handoff_status IN ('preparing', 'failed')
+    `).run(clean(jobId), new Date().toISOString(), clean(id));
+  }
+
+  findLivernoJob(customerId) {
+    const row = this.db.prepare(`
+      SELECT * FROM marketing_jobs WHERE source = 'liverno' AND customer_id = ?
+      ORDER BY created_at ASC LIMIT 1
+    `).get(clean(customerId));
+    return row ? mapJob(row) : null;
+  }
+
+  failLivernoHandoff(id, status, reason) {
+    this.db.prepare(`
+      UPDATE marketing_customers SET handoff_status = ?, failure_reason = ?, updated_at = ?
+      WHERE id = ? AND handoff_status = 'preparing'
+    `).run(clean(status), clean(reason), new Date().toISOString(), clean(id));
+  }
+
+  saveLivernoContact({ customerId, personId, name, title, recipient, emailStatus }) {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO marketing_contacts
+        (id, marketing_customer_id, apollo_person_id, name, title, email,
+         email_status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(marketing_customer_id, apollo_person_id) DO UPDATE SET
+        name = excluded.name, title = excluded.title, email = excluded.email,
+        email_status = excluded.email_status, updated_at = excluded.updated_at
+    `).run(crypto.randomUUID(), clean(customerId), clean(personId), clean(name),
+      clean(title), email(recipient), clean(emailStatus), now, now);
+  }
+
+  findLivernoConflict({ sourceId, domain, recipient = '' }) {
+    const otherCustomer = this.db.prepare(`
+      SELECT id FROM marketing_customers
+      WHERE source = 'liverno' AND source_id <> ? AND domain = ?
+        AND handoff_status IN ('preparing', 'queued') LIMIT 1
+    `).get(clean(sourceId), clean(domain));
+    if (otherCustomer) return 'same_domain_liverno';
+    const active = ACTIVE_STATUSES.map(() => '?').join(',');
+    const otherJob = this.db.prepare(`
+      SELECT id FROM marketing_jobs
+      WHERE source <> 'liverno' AND status IN (${active})
+        AND ((domain <> '' AND domain = ?) OR (? <> '' AND email = ?)) LIMIT 1
+    `).get(...ACTIVE_STATUSES, clean(domain), email(recipient), email(recipient));
+    return otherJob ? 'cross_source_job' : '';
   }
 
   backfillTodayScreeningBatch(now = new Date()) {
@@ -326,9 +446,13 @@ export class MarketingStore {
     return Boolean(this.db.prepare('SELECT 1 FROM marketing_suppressions WHERE email = ?').get(email(recipient)));
   }
 
-  canContact({ customerId, recipient, cooldownDays = 7, companyEmailLimit = 5 }) {
+  canContact({ customerId, recipient, domain = '', cooldownDays = 7, companyEmailLimit = 5 }) {
     const normalized = email(recipient);
     if (!normalized || this.isSuppressed(normalized)) return false;
+    if (clean(domain) && this.db.prepare(`
+      SELECT 1 FROM marketing_jobs WHERE source = 'liverno' AND domain = ?
+        AND status IN ('queued', 'retry', 'processing', 'needs_attention', 'sent') LIMIT 1
+    `).get(clean(domain))) return false;
     const cutoff = new Date(Date.now() - Number(cooldownDays) * 86_400_000).toISOString();
     const placeholders = ACTIVE_STATUSES.map(() => '?').join(',');
     const recentEmail = this.db.prepare(`
@@ -535,8 +659,9 @@ export class MarketingStore {
       INSERT INTO marketing_jobs (
         id, campaign, dedupe_key, customer_id, contact_id, company_name, contact_name, email,
         country, time_zone, subject, html_content, text_content, status, score, scheduled_at,
-        max_attempts, apollo_json, draft_json, writeback_json, feishu_record_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        max_attempts, apollo_json, draft_json, writeback_json, feishu_record_id, created_at, updated_at,
+        source, source_id, research_id, domain
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, campaign, dedupeKey, clean(input.customerId), clean(input.contactId), clean(input.companyName),
       clean(input.contactName), normalizedEmail, clean(input.country), clean(input.timeZone) || 'UTC',
@@ -544,6 +669,8 @@ export class MarketingStore {
       Number(input.score) || 0, clean(input.scheduledAt) || now, Number(input.maxAttempts) || 3,
       JSON.stringify(input.apollo || {}), JSON.stringify(input.draft || {}),
       JSON.stringify(input.writeback || {}), clean(input.feishuRecordId), now, now,
+      clean(input.source) || 'fumeng', clean(input.sourceId) || clean(input.customerId),
+      clean(input.researchId), clean(input.domain),
     );
     this.addEvent(id, 'queued', `Scheduled for ${clean(input.scheduledAt) || now}`);
     return { created: true, job: this.getJob(id) };

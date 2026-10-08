@@ -1,7 +1,15 @@
 import { AppError } from '../lib/errors.mjs';
 import { researchWebsite as fetchWebsiteEvidence } from '../lib/website-research.mjs';
 
-function buildInstructions(sales) {
+function buildInstructions(sales, reuseQualification = false) {
+  if (reuseQualification) return `You are a B2B outbound email drafting agent for ${sales.companyName}.
+The company has already passed a separate, completed qualification review. Do not reassess company fit.
+Use the supplied qualification decision and research evidence only to draft one first-touch email and recommend 2-8 relevant MEAN WELL product categories or series.
+Return the required structured schema with qualified=true, reviewRequired=false, and qualificationReason copied from the supplied decision.
+Never invent customer facts, prices, inventory, certifications, projects, or sourcing needs.
+Write professional English of 120-190 words, beginning with "Dear <company name> Team," or "Dear <contact name>," when a real name is supplied.
+The emailBody must contain only the greeting and message body, with no signature or contact details. End with one concise, low-pressure call to action.
+Set compliance.approved=false for unsupported claims or guaranteed commercial outcomes.`;
   return `You are a B2B outbound research and email drafting agent for a long-term MEAN WELL power supply distributor.
 
 Business facts you may use:
@@ -39,10 +47,13 @@ Hard requirements:
 - compliance.approved must be false if the draft contains an unsupported factual claim or a guaranteed commercial outcome.`;
 }
 
-function buildInput(customer, contact, researchWebsite, websiteEvidence, qualificationDecision, organizationEvidence) {
+function buildInput(customer, contact, researchWebsite, websiteEvidence, qualificationDecision, organizationEvidence,
+  reuseQualification = false) {
   return JSON.stringify(
     {
-      task: 'Qualify this customer, create a concise profile, suggest relevant MEAN WELL categories, and draft one first-touch email for automatic delivery when the quality checks pass.',
+      task: reuseQualification
+        ? 'Use the completed qualification without reassessing it. Suggest relevant MEAN WELL categories and draft one first-touch email.'
+        : 'Qualify this customer, create a concise profile, suggest relevant MEAN WELL categories, and draft one first-touch email for automatic delivery when the quality checks pass.',
       evidencePolicy: researchWebsite
         ? 'Use the official website as the primary source, with CRM and Apollo organization data as corroborating evidence. Cite only facts present in the supplied evidence.'
         : 'Use only the CRM fields below. Do not imply that you visited or reviewed the website.',
@@ -141,6 +152,7 @@ export class DraftService {
     websiteEvidence,
     qualificationDecision,
     organizationEvidence,
+    reuseQualification = false,
   }) {
     if (!customer?.id || !contact?.email) {
       throw new AppError('生成草稿缺少客户或联系人邮箱', {
@@ -155,6 +167,7 @@ export class DraftService {
       websiteEvidence,
       qualificationDecision,
       organizationEvidence,
+      reuseQualification,
     });
   }
 
@@ -165,6 +178,7 @@ export class DraftService {
     websiteEvidence,
     qualificationDecision,
     organizationEvidence,
+    reuseQualification = false,
   }) {
     if (!customer?.id) {
       throw new AppError('公司分析缺少客户信息', {
@@ -176,8 +190,9 @@ export class DraftService {
       ? await this.researchCompany(customer)
       : websiteEvidence;
     const draft = await this.openai.createOutboundDraft({
-      instructions: buildInstructions(this.sales),
-      input: buildInput(customer, contact, researchWebsite, evidence, qualificationDecision, organizationEvidence),
+      instructions: buildInstructions(this.sales, reuseQualification),
+      input: buildInput(customer, contact, researchWebsite, evidence, qualificationDecision,
+        organizationEvidence, reuseQualification),
       customerId: customer.id,
       researchWebsite,
     });

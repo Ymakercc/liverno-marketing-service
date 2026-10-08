@@ -87,3 +87,28 @@ test('company analysis does not require an email recipient', async () => {
   assert.match(modelRequest.input, /Unknown Company/);
   assert.doesNotMatch(modelRequest.input, /"email"/);
 });
+
+test('prequalified Liverno draft reuses C1 evidence without website fetch or another fit judgment', async () => {
+  let modelRequest;
+  const service = new DraftService({
+    fumeng: {},
+    openai: { createOutboundDraft: async (request) => {
+      modelRequest = request;
+      return { qualified: false, emailSubject: 'Industrial support' };
+    } },
+    sales: { teamName: 'KULON', email: 'sales@kulon.com', companyName: 'Seller', website: 'https://seller.example' },
+    websiteResearch: async () => { throw new Error('Website must not be fetched again'); },
+  });
+  const result = await service.generateFromData({
+    customer: { id: 'local-1', companyName: 'Verified Co', website: 'https://verified.example' },
+    contact: { id: 'person-1', name: 'Buyer', email: 'buyer@verified.example' },
+    researchWebsite: true, reuseQualification: true,
+    websiteEvidence: { status: 'fetched', text: 'Verified industrial controls' },
+    qualificationDecision: { qualified: true, reason: 'Completed C1 decision' },
+  });
+  assert.equal(result.draft.qualified, true);
+  assert.equal(result.draft.qualificationReason, 'Completed C1 decision');
+  assert.match(modelRequest.instructions, /Do not reassess company fit/);
+  assert.match(modelRequest.input, /without reassessing it/);
+  assert.doesNotMatch(modelRequest.input, /buyer@verified\.example/);
+});

@@ -16,6 +16,8 @@ import {
 import { selectPricedModels } from '../lib/price-catalog.mjs';
 import { getProductImage, listProductImageModels } from '../lib/product-images.mjs';
 import { scorePerson } from './enrichment-service.mjs';
+import { normalizeDomain } from '../lib/apollo-client.mjs';
+import { getDomain } from 'tldts';
 
 function clean(value) {
   return value === undefined || value === null ? '' : String(value).trim();
@@ -833,10 +835,14 @@ export class MarketingService {
     const queuedJobs = [];
     const excluded = [];
     const contactOutcomes = [];
+    const customerDomain = getDomain(normalizeDomain(
+      assessedCustomer.website || enrichment.organization?.domain,
+    )) || '';
     for (const [index, candidate] of candidates.entries()) {
       if (!this.marketing.canContact({
         customerId: customer.id,
         recipient: candidate.contact.email,
+        domain: customerDomain,
         cooldownDays: this.config.marketing.companyCooldownDays,
         companyEmailLimit: COMPANY_EMAIL_LIMIT,
       })) {
@@ -930,6 +936,9 @@ export class MarketingService {
         priceListDate: this.priceCatalog?.generatedDate || '',
       });
       const result = this.marketing.enqueue({
+        source: 'fumeng',
+        sourceId: customer.id,
+        domain: customerDomain,
         customerId: customer.id,
         contactId: candidate.contact.id,
         companyName: customer.companyName,
@@ -1080,7 +1089,8 @@ export class MarketingService {
     const candidates = [];
     for (const engagement of this.delivery.listOpenedRecipients({ limit: 10_000 })) {
       const firstJob = this.marketing.findJobByMessageId(engagement.messageId);
-      if (!firstJob || firstJob.campaign !== 'initial_outreach_v1' || firstJob.status !== 'sent') continue;
+      if (!firstJob || firstJob.source === 'liverno' ||
+          firstJob.campaign !== 'initial_outreach_v1' || firstJob.status !== 'sent') continue;
       if (this.marketing.isSuppressed?.(firstJob.email)) continue;
       const eligibleAt = secondTouchEligibleAt(firstJob.sentAt, engagement.openCount, this.config.marketing);
       if (!eligibleAt || eligibleAt > current) continue;
@@ -1304,7 +1314,7 @@ export class MarketingService {
       limit,
       dailyLimit: this.config.marketing.dailySendLimit,
       now,
-      isEligible: (job) => isInsideSendWindow(now, job.timeZone, {
+      isEligible: (job) => job.source !== 'liverno' && isInsideSendWindow(now, job.timeZone, {
         startHour: this.config.marketing.sendWindowStartHour,
         endHour: this.config.marketing.sendWindowEndHour,
       }),
