@@ -43,6 +43,18 @@ test('marketing queue is idempotent, enforces daily capacity, and suppresses sto
   assert.equal(store.getDashboard().items.find((item) => item.email === 'blocked@example.com').status, 'cancelled');
 });
 
+test('a processing reservation consumes shared capacity until it is resolved', (t) => {
+  const store = makeStore(t);
+  const first = store.enqueue(input()).job;
+  store.enqueue(input({ customerId: 'customer-2', contactId: 'contact-2',
+    email: 'other@example.com' }));
+  assert.equal(store.reserveDue({ limit: 1, dailyLimit: 1 }).length, 1);
+  assert.equal(store.reserveDue({ limit: 1, dailyLimit: 1 }).length, 0);
+  store.deferJob(first.id, 'temporary block', new Date(Date.now() + 60_000).toISOString(),
+    { restoreAttempt: true });
+  assert.equal(store.reserveDue({ limit: 1, dailyLimit: 1 }).length, 1);
+});
+
 test('sent jobs can be resolved from a Brevo message id for email previews', (t) => {
   const store = makeStore(t);
   const created = store.enqueue(input());

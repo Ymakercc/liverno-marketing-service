@@ -301,6 +301,17 @@ export class MarketingStore {
       clean(title), email(recipient), clean(emailStatus), now, now);
   }
 
+  getLivernoContact(customerId, personId) {
+    const row = this.db.prepare(`
+      SELECT apollo_person_id, email, email_status, title FROM marketing_contacts
+      WHERE marketing_customer_id = ? AND apollo_person_id = ?
+    `).get(clean(customerId), clean(personId));
+    return row ? {
+      personId: row.apollo_person_id, email: row.email,
+      emailStatus: row.email_status, title: row.title,
+    } : null;
+  }
+
   findLivernoConflict({ sourceId, domain, recipient = '' }) {
     const otherCustomer = this.db.prepare(`
       SELECT id FROM marketing_customers
@@ -796,13 +807,18 @@ export class MarketingStore {
     const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
     const start = new Date(now);
     start.setHours(0, 0, 0, 0);
-    const sentToday = Number(this.db.prepare(
-      "SELECT COUNT(*) AS count FROM marketing_jobs WHERE status = 'sent' AND sent_at >= ?",
-    ).get(start.toISOString()).count);
-    const available = Math.max(Math.min(safeLimit, Number(dailyLimit) - sentToday), 0);
-    if (!available) return [];
     this.db.exec('BEGIN IMMEDIATE');
     try {
+      const usedToday = Number(this.db.prepare(`
+        SELECT COUNT(*) AS count FROM marketing_jobs
+        WHERE (status = 'sent' AND sent_at >= ?)
+           OR (status = 'processing' AND updated_at >= ?)
+      `).get(start.toISOString(), start.toISOString()).count);
+      const available = Math.max(Math.min(safeLimit, Number(dailyLimit) - usedToday), 0);
+      if (!available) {
+        this.db.exec('COMMIT');
+        return [];
+      }
       const candidates = this.db.prepare(`
         SELECT j.* FROM marketing_jobs j
         LEFT JOIN marketing_suppressions s ON s.email = j.email
@@ -886,6 +902,15 @@ export class MarketingStore {
       UPDATE marketing_jobs SET status = ?, failure_reason = ?, scheduled_at = ?, updated_at = ? WHERE id = ?
     `).run(retry ? 'retry' : 'failed', clean(error?.message || error), scheduledAt, new Date().toISOString(), clean(id));
     this.addEvent(id, retry ? 'retry' : 'failed', clean(error?.message || error));
+    return this.getJob(id);
+  }
+
+  markLivernoNeedsAttention(id, reason) {
+    const updated = this.db.prepare(`
+      UPDATE marketing_jobs SET status = 'needs_attention', failure_reason = ?, updated_at = ?
+      WHERE id = ? AND source = 'liverno' AND status = 'processing'
+    `).run(clean(reason), new Date().toISOString(), clean(id));
+    if (updated.changes) this.addEvent(id, 'needs_attention', clean(reason));
     return this.getJob(id);
   }
 

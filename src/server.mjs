@@ -29,6 +29,7 @@ import { MarketingService } from './services/marketing-service.mjs';
 import { ResearchService } from './services/research-service.mjs';
 import { QualificationService } from './services/qualification-service.mjs';
 import { LivernoHandoffService } from './services/liverno-handoff-service.mjs';
+import { LivernoSenderService } from './services/liverno-sender-service.mjs';
 import { MailboxMonitor } from './services/mailbox-monitor.mjs';
 import { getRelaySettings, updateRelaySettings } from './lib/relay-settings.mjs';
 import { getMarketingSettings, updateMarketingSettings } from './lib/marketing-settings.mjs';
@@ -83,6 +84,10 @@ const marketing = new MarketingService({
 });
 const livernoHandoff = new LivernoHandoffService({
   research: researchStore, marketing: marketingStore, apollo, drafts, config, priceCatalog, fumeng,
+});
+const livernoSender = new LivernoSenderService({
+  research: researchStore, marketing: marketingStore, handoff: livernoHandoff,
+  brevo, delivery, config,
 });
 let dailyMarketingRun = null;
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
@@ -782,6 +787,11 @@ async function handleApi(request, response, url) {
     const body = await readBody(request);
     const result = await marketing.sendDue({ limit: body.limit });
     return sendJson(response, 200, result);
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/liverno/send-due') {
+    const body = await readBody(request);
+    return sendJson(response, 200, await livernoSender.sendDue({ limit: body.limit }));
   }
 
   if (request.method === 'POST' && url.pathname === '/api/automation/inbox/poll') {
