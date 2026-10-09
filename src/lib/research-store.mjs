@@ -7,6 +7,11 @@ function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
 }
 
+function parseObject(value) {
+  const parsed = parseJson(value, {});
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+}
+
 function mapRecord(row) {
   if (!row) return null;
   return {
@@ -42,7 +47,7 @@ function mapRecord(row) {
       description: row.website_description || '',
       keywords: row.website_keywords || '',
       text: row.website_text || '',
-      signals: parseJson(row.website_signals_json, {}),
+      signals: parseObject(row.website_signals_json),
       error: row.website_error || '',
     },
     qualification: {

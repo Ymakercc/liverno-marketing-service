@@ -73,6 +73,23 @@ test('paused Apollo research rejects new intake without spending credit but can 
   assert.equal(calls.enrich, 0);
 });
 
+test('website signals remain an object for new, completed, and malformed historical records', async (t) => {
+  const { store } = fixture(t);
+  const record = store.create(validateResearchInput(input())).record;
+  assert.deepEqual(record.website_research.signals, {});
+  store.start(record.id);
+  store.finish(record.id, { status: 'completed', organization, matchScore: 95 });
+  assert.deepEqual(store.getBySource('liverno', SOURCE_ID).website_research.signals, {});
+  for (const historical of ['null', '[]', 'not-json']) {
+    store.db.prepare('UPDATE research_records SET website_signals_json = ? WHERE id = ?')
+      .run(historical, record.id);
+    assert.deepEqual(store.get(record.id).website_research.signals, {});
+  }
+  store.db.prepare('UPDATE research_records SET website_signals_json = ? WHERE id = ?')
+    .run('{"directFit":true}', record.id);
+  assert.deepEqual(store.get(record.id).website_research.signals, { directFit: true });
+});
+
 test('intake persists company and minimal people, then repeats without Apollo or a second record', async (t) => {
   const { service, store, calls, databasePath } = fixture(t);
   const first = await service.intake(input());
